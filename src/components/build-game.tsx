@@ -137,33 +137,42 @@ function JerseyBack({
   const kit = kitForTeam(teamId);
   const shown = number != null ? String(number) : "—";
   const fillId = `kit-${teamId}-${name.replace(/\s+/g, "")}`;
-  const nameSize = name.length > 14 ? 9 : name.length > 10 ? 11 : 13;
+  const nameSize = name.length > 14 ? 10 : name.length > 10 ? 12 : 14;
   // Light print or stripes need a dark outline so name/number stay readable.
-  const needsDarkOutline = Boolean(kit.stripe) || hexLuma(kit.number) > 0.62 || hexLuma(kit.primary) > 0.72;
-  const textStroke = needsDarkOutline ? "#0a0a0a" : "rgba(0,0,0,0.35)";
-  const textProps = {
+  const needsDarkOutline = Boolean(kit.stripe) || hexLuma(kit.number) > 0.55 || hexLuma(kit.primary) > 0.65;
+  const textStroke = needsDarkOutline ? "#0a0a0a" : "rgba(0,0,0,0.45)";
+  const nameStroke = needsDarkOutline ? 2.1 : 1.1;
+  const numberStroke = needsDarkOutline ? 3.2 : 1.6;
+  const nameProps = {
     fill: kit.number,
     stroke: textStroke,
-    strokeWidth: needsDarkOutline ? 1.35 : 0.7,
+    strokeWidth: nameStroke,
     paintOrder: "stroke fill" as const,
     style: { fontFamily: "var(--nf-display), Arial Narrow, sans-serif" },
   };
+  const numberProps = {
+    fill: kit.number,
+    stroke: textStroke,
+    strokeWidth: numberStroke,
+    paintOrder: "stroke fill" as const,
+    style: { fontFamily: "var(--nf-condensed), Arial Narrow, sans-serif", fontWeight: 700 },
+  };
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_35%,#123024_0%,#06140e_72%)] px-3 py-2 sm:px-4"
+      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_35%,#123024_0%,#06140e_72%)] px-2 py-2 sm:px-3"
       aria-label={`${name} ${shown}, ${teamName}`}
     >
       <svg
-        viewBox="0 0 200 170"
-        className="h-auto w-[92%] max-h-[96%] drop-shadow-[0_10px_20px_rgba(0,0,0,0.55)]"
+        viewBox="0 0 260 200"
+        className="h-auto w-full max-h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.55)]"
         role="img"
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
           {kit.stripe ? (
-            <pattern id={fillId} width="14" height="14" patternUnits="userSpaceOnUse">
-              <rect width="14" height="14" fill={kit.primary} />
-              <rect x="7" width="7" height="14" fill={kit.stripe} />
+            <pattern id={fillId} width="16" height="16" patternUnits="userSpaceOnUse">
+              <rect width="16" height="16" fill={kit.primary} />
+              <rect x="8" width="8" height="16" fill={kit.stripe} />
             </pattern>
           ) : (
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
@@ -173,66 +182,65 @@ function JerseyBack({
           )}
         </defs>
 
-        {/* Normal football-shirt proportions: broad torso + short sleeves */}
+        {/* Broad matchday silhouette — wide torso, short sleeves (kit-icon style) */}
         <path
-          d="M62 28
-             L70 10
-             L84 22
-             L100 22
-             L116 10
-             L124 28
-             L188 48
-             L176 88
-             L142 70
-             L142 158
-             L58 158
-             L58 70
-             L24 88
-             L12 48
+          d="M88 36
+             L98 14
+             L114 28
+             L130 28
+             L146 14
+             L156 36
+             L248 52
+             L234 98
+             L182 78
+             L182 178
+             L78 178
+             L78 78
+             L26 98
+             L12 52
              Z"
           fill={`url(#${fillId})`}
           stroke={kit.secondary}
-          strokeWidth="2.2"
+          strokeWidth="2.4"
           strokeLinejoin="round"
         />
 
         {/* collar */}
-        <ellipse cx="100" cy="20" rx="16" ry="9" fill="#06140e" />
-        <path d="M84 22 Q100 34 116 22" fill="none" stroke={kit.secondary} strokeWidth="1.8" />
+        <ellipse cx="130" cy="26" rx="20" ry="11" fill="#06140e" />
+        <path d="M110 28 Q130 44 150 28" fill="none" stroke={kit.secondary} strokeWidth="2" />
 
-        {/* cuff lines */}
-        <path d="M12 48 L24 88" fill="none" stroke={kit.secondary} strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M188 48 L176 88" fill="none" stroke={kit.secondary} strokeWidth="2.6" strokeLinecap="round" />
+        {/* cuff accents */}
+        <path d="M12 52 L26 98" fill="none" stroke={kit.secondary} strokeWidth="3" strokeLinecap="round" />
+        <path d="M248 52 L234 98" fill="none" stroke={kit.secondary} strokeWidth="3" strokeLinecap="round" />
 
-        {/* seams + hem */}
-        <path d="M58 70 L58 158" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.3" />
-        <path d="M142 70 L142 158" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.3" />
-        <path d="M58 158 L142 158" fill="none" stroke={kit.secondary} strokeWidth="1.8" opacity="0.55" />
+        {/* side seams + hem */}
+        <path d="M78 78 L78 178" fill="none" stroke={kit.secondary} strokeWidth="1.1" opacity="0.28" />
+        <path d="M182 78 L182 178" fill="none" stroke={kit.secondary} strokeWidth="1.1" opacity="0.28" />
+        <path d="M78 178 L182 178" fill="none" stroke={kit.secondary} strokeWidth="2" opacity="0.55" />
 
-        <text x="100" y="58" textAnchor="middle" fontSize={nameSize} letterSpacing="1.6" {...textProps}>
+        <text x="130" y="68" textAnchor="middle" fontSize={nameSize} letterSpacing="1.8" {...nameProps}>
           {name}
         </text>
         <text
-          x="100"
-          y="118"
+          x="130"
+          y="136"
           textAnchor="middle"
-          fontSize={shown.length > 1 ? 54 : 62}
+          fontSize={shown.length > 1 ? 58 : 68}
           letterSpacing="1"
-          {...textProps}
-          style={{ fontFamily: "var(--nf-condensed), Arial Narrow, sans-serif", fontWeight: 700 }}
+          {...numberProps}
         >
           {shown}
         </text>
 
         {prime ? (
           <g>
-            <rect x="74" y="136" width="52" height="12" fill="#ff5a3c" stroke="#0a0a0a" strokeWidth="0.8" />
+            <rect x="100" y="156" width="60" height="14" fill="#ff5a3c" stroke="#0a0a0a" strokeWidth="0.8" />
             <text
-              x="100"
-              y="145"
+              x="130"
+              y="166"
               textAnchor="middle"
               fill="#06140e"
-              fontSize="7"
+              fontSize="8"
               letterSpacing="1.6"
               style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
             >
