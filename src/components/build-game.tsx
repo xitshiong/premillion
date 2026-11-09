@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { BookOpen, RotateCcw, Trophy, Volume2, VolumeX } from "lucide-react";
 import { PixelStadium } from "@/components/pixel-stadium";
+import { kitForTeam } from "@/lib/kits";
 import {
   ACTIVE_QUESTS,
   questById,
@@ -109,17 +109,72 @@ function verdict(place: number) {
   return { title: "Relegated", line: "the stitches didn't hold.", sound: "relegated" as const, color: "text-kit" };
 }
 
-function Portrait({ url, name }: { url: string | null; name: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) {
-    const initials = name
-      .split(" ")
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("");
-    return <p className="absolute inset-0 grid place-items-center font-pixel text-4xl text-line lg:text-6xl">{initials}</p>;
-  }
-  return <Image src={url} alt={name} fill unoptimized loading="eager" sizes="280px" className="object-contain object-bottom" onError={() => setFailed(true)} />;
+/** Shirt back: club kit colours, surname across the shoulders, big number. */
+function JerseyBack({
+  teamId,
+  teamName,
+  name,
+  number,
+  prime,
+}: {
+  teamId: number;
+  teamName: string;
+  name: string;
+  number: number | null;
+  prime?: boolean;
+}) {
+  const kit = kitForTeam(teamId);
+  const shown = number != null ? String(number) : "—";
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(180deg,#0a1a12_0%,#06140e_100%)] p-3 sm:p-4" aria-label={`${name} ${shown}, ${teamName}`}>
+      <div
+        className="relative aspect-[4/5] h-full max-h-full w-auto min-w-[42%] overflow-hidden"
+        style={{
+          background: kit.stripe
+            ? `repeating-linear-gradient(90deg, ${kit.primary} 0 10px, ${kit.stripe} 10px 16px)`
+            : `linear-gradient(165deg, ${kit.primary} 0%, ${kit.primary} 62%, color-mix(in srgb, ${kit.primary} 75%, #000) 100%)`,
+          clipPath: "polygon(18% 6%, 38% 6%, 42% 0%, 58% 0%, 62% 6%, 82% 6%, 96% 18%, 96% 100%, 4% 100%, 4% 18%)",
+          boxShadow: `inset 0 0 0 2px color-mix(in srgb, ${kit.secondary} 35%, transparent), 0 10px 28px rgba(0,0,0,0.45)`,
+        }}
+      >
+        {/* collar / neck */}
+        <div
+          className="absolute top-[5%] left-1/2 h-[10%] w-[22%] -translate-x-1/2 rounded-b-[40%]"
+          style={{ background: `color-mix(in srgb, ${kit.primary} 55%, #000)` }}
+        />
+        {/* shoulder seam */}
+        <div className="absolute top-[14%] right-[8%] left-[8%] h-px opacity-40" style={{ background: kit.secondary }} />
+        <div className="absolute inset-x-[8%] top-[17%] flex flex-col items-center px-1">
+          <p
+            className="w-full text-center font-pixel leading-tight tracking-[0.12em]"
+            style={{
+              color: kit.number,
+              textShadow: "0 1px 0 rgba(0,0,0,0.35)",
+              fontSize: name.length > 11 ? "clamp(0.55rem,1.7vw,0.78rem)" : name.length > 8 ? "clamp(0.65rem,2vw,0.9rem)" : "clamp(0.75rem,2.4vw,1.05rem)",
+            }}
+          >
+            {name}
+          </p>
+          <p
+            className="mt-1 font-digits leading-none"
+            style={{
+              color: kit.number,
+              fontSize: "clamp(3.2rem, 12vw, 5.5rem)",
+              textShadow: "0 2px 0 rgba(0,0,0,0.35)",
+            }}
+          >
+            {shown}
+          </p>
+        </div>
+        {prime ? (
+          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-kit px-1.5 py-0.5 font-pixel text-[8px] tracking-[0.2em] text-night">PRIME</span>
+        ) : null}
+        {/* side panels / sleeves hint */}
+        <div className="absolute top-[20%] bottom-[8%] left-0 w-[7%] opacity-25" style={{ background: kit.secondary }} />
+        <div className="absolute top-[20%] bottom-[8%] right-0 w-[7%] opacity-25" style={{ background: kit.secondary }} />
+      </div>
+    </div>
+  );
 }
 
 function Key({ children, className = "inline-grid" }: { children: React.ReactNode; className?: string }) {
@@ -941,7 +996,14 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   </div>
                 ) : (
                   <>
-                    <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
+                    <JerseyBack
+                      key={rolled.id}
+                      teamId={rolled.teamId}
+                      teamName={rolled.teamName}
+                      name={rolled.jerseyName}
+                      number={rolled.shirtNumber}
+                      prime={rolled.prime}
+                    />
                     <div className="absolute top-2 right-2 hidden border border-line bg-night/85 px-2 py-1 text-center lg:block">
                       <p className="font-pixel text-[9px] tracking-widest text-haze">OVR</p>
                       <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>

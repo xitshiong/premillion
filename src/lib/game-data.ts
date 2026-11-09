@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getIndex, getPlayer } from "@/lib/data";
+import { jerseyName } from "@/lib/kits";
 import {
   BUILD_STATS,
   FORM_WEIGHT,
@@ -142,7 +143,9 @@ export function getGameData(): GameData {
       eaOverall: rating.overall,
       formDelta,
       prime: false,
-      avatarUrl: rating.avatarUrl,
+      avatarUrl: null,
+      shirtNumber: player.shirtNumber,
+      jerseyName: jerseyName(player.name),
       teamId: player.teamId,
       teamName: teamName.get(player.teamId) ?? "Unknown",
       nationality: player.nationality ?? null,

@@ -51,6 +51,8 @@ export type RollPlayer = {
   formDelta: number;
   prime: boolean;
   avatarUrl: string | null;
+  shirtNumber: number | null;
+  jerseyName: string;
   teamId: number;
   teamName: string;
   nationality: string | null;
