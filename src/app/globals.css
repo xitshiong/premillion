@@ -5,26 +5,27 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-night: #060a13;
-  --color-turf: #0b1424;
-  --color-stand: #101c31;
-  --color-line: #1c2c47;
-  --color-chalk: #eaf1ff;
-  --color-haze: #8394b6;
-  --color-dim: #4c5f82;
-  --color-flood: #5ee6ff;
-  --color-kit: #ff5d8f;
-  --color-gold: #ffd166;
-  --color-grass: #4fd68f;
-  --color-tier-world: #ffd166;
-  --color-tier-elite: #ff7bac;
-  --color-tier-starter: #7deaff;
-  --color-tier-squad: #d7e1f2;
-  --color-tier-bench: #6a7fa6;
+  /* Matchday pitch night: green blacks, floodlight amber, chalk white. Not the cyan/pink arcade pair. */
+  --color-night: #06140e;
+  --color-turf: #0c1f16;
+  --color-stand: #123024;
+  --color-line: #234d36;
+  --color-chalk: #f1f7ef;
+  --color-haze: #8eab96;
+  --color-dim: #5a7a66;
+  --color-flood: #f0c14a;
+  --color-kit: #ff5a3c;
+  --color-gold: #f0c14a;
+  --color-grass: #3ecf6e;
+  --color-tier-world: #f0c14a;
+  --color-tier-elite: #ff8a5c;
+  --color-tier-starter: #3ecf6e;
+  --color-tier-squad: #d7e8d9;
+  --color-tier-bench: #6f8f7a;
 
-  --font-pixel: var(--nf-pixel), ui-monospace, monospace;
-  --font-digits: var(--nf-digits), ui-monospace, monospace;
-  --font-ui: var(--font-ui-mono), ui-monospace, monospace;
+  --font-pixel: var(--nf-display), "Arial Narrow", Impact, sans-serif;
+  --font-digits: var(--nf-condensed), "Arial Narrow", sans-serif;
+  --font-ui: var(--nf-mono), ui-monospace, monospace;
 
   --animate-card-pop: card-pop 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
   --animate-tile-in: tile-in 320ms ease-out both;
@@ -80,8 +81,8 @@
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
   @keyframes slot-fill {
-    0% { box-shadow: 0 0 0 0 rgba(94, 230, 255, 0.7); background-color: rgba(94, 230, 255, 0.18); }
-    100% { box-shadow: 0 0 0 10px rgba(94, 230, 255, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(62, 207, 110, 0.7); background-color: rgba(62, 207, 110, 0.18); }
+    100% { box-shadow: 0 0 0 10px rgba(62, 207, 110, 0); }
   }
   @keyframes ticker {
     0% { transform: translateY(-6px); opacity: 0.5; filter: blur(1px); }
@@ -93,44 +94,37 @@
   }
 }
 
-.crt::after {
-  content: "";
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 3px);
-  mix-blend-mode: overlay;
+/* Soft turf grain instead of CRT scanlines. */
+.crt {
+  background-image:
+    radial-gradient(ellipse at 50% -10%, rgba(62, 207, 110, 0.12), transparent 55%),
+    linear-gradient(180deg, rgba(240, 193, 74, 0.04), transparent 28%);
 }
 
 .title-split {
-  text-shadow:
-    -3px 0 0 rgba(255, 93, 143, 0.9),
-    3px 0 0 rgba(94, 230, 255, 0.9);
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45), 0 0 28px rgba(240, 193, 74, 0.2);
 }
 
 .glow-flood {
   box-shadow:
-    0 0 0 1px rgba(94, 230, 255, 0.9),
-    0 0 18px rgba(94, 230, 255, 0.28),
-    inset 0 0 18px rgba(94, 230, 255, 0.08);
+    0 0 0 1px rgba(240, 193, 74, 0.95),
+    0 0 18px rgba(240, 193, 74, 0.22),
+    inset 0 0 18px rgba(240, 193, 74, 0.06);
 }
 
 .glow-kit {
   box-shadow:
-    0 0 0 1px rgba(255, 93, 143, 0.9),
-    0 0 18px rgba(255, 93, 143, 0.22),
-    inset 0 0 18px rgba(255, 93, 143, 0.07);
+    0 0 0 1px rgba(255, 90, 60, 0.95),
+    0 0 18px rgba(255, 90, 60, 0.2),
+    inset 0 0 18px rgba(255, 90, 60, 0.06);
 }
 
-/* Stepped corners, so panels read as pixel frames rather than rounded cards. */
+/* Match boards: hard edge + a pitch-side stripe, not stepped pixel frames. */
 .pixel-frame {
-  clip-path: polygon(
-    0 6px, 3px 6px, 3px 3px, 6px 3px, 6px 0,
-    calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
-    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%,
-    6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px)
-  );
+  border: 1px solid var(--color-line);
+  box-shadow: inset 3px 0 0 var(--color-grass);
+  background-image: linear-gradient(90deg, rgba(62, 207, 110, 0.05), transparent 40%);
 }
 
 .pixelated {

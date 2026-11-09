@@ -6,6 +6,7 @@ export type PickRecord = RollStat & {
   playerName: string;
   teamId: number;
   teamName: string;
+  nationality: string | null;
   role: RollPlayer["role"];
   position: string;
   overall: number;

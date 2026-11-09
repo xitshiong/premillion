@@ -145,6 +145,7 @@ export function getGameData(): GameData {
       avatarUrl: rating.avatarUrl,
       teamId: player.teamId,
       teamName: teamName.get(player.teamId) ?? "Unknown",
+      nationality: player.nationality ?? null,
       minutes: player.minutes,
       appearances: player.appearances,
       goals: player.goals,

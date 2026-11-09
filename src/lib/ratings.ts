@@ -53,6 +53,7 @@ export type RollPlayer = {
   avatarUrl: string | null;
   teamId: number;
   teamName: string;
+  nationality: string | null;
   minutes: number;
   appearances: number;
   goals: number;

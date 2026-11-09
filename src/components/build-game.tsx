@@ -18,6 +18,7 @@ import {
   type PickRecord,
   type Reward,
 } from "@/lib/quests";
+import { withChemistry } from "@/lib/chemistry";
 import { ACHIEVEMENTS, profileStore, type AchievementId } from "@/lib/profile";
 import { BUILD_STATS, PRIME_CHANCE, asPrime, buildRating, clubWithUser, strengthFrom, type ClubRating, type GameData, type RollPlayer, type RollStat } from "@/lib/ratings";
 import { muteStore, sfx } from "@/lib/sfx";
@@ -206,8 +207,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   const spinning = spin !== null;
   const clubPool = byClub.get(rolled.teamId) ?? [];
   const lockedStats = Object.values(locked);
-  const rating = buildRating(lockedStats);
-  const profile = complete ? strengthFrom(lockedStats) : null;
+  const chemistry = withChemistry(lockedStats);
+  const rating = buildRating(chemistry.boosted);
+  const profile = complete ? strengthFrom(chemistry.boosted) : null;
 
   const runSpin = useCallback((frames: (() => Spin)[], land: () => void, sound: "tick" | "drum" = "tick") => {
     if (timer.current) clearInterval(timer.current);
@@ -332,6 +334,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       playerName: rolled.name,
       teamId: rolled.teamId,
       teamName: rolled.teamName,
+      nationality: rolled.nationality,
       role: rolled.role,
       position: rolled.position,
       overall: rolled.overall,
@@ -346,9 +349,10 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     sfx().play(stat.value >= 90 ? "pick-world" : stat.value >= 85 ? "pick-elite" : "pick");
     const questDone = settleQuests(picks, picks.length === 10);
     if (picks.length === 10) {
+      const final = withChemistry(picks).boosted;
       const unlocked = profileStore.noteBuild(
-        buildRating(picks),
-        picks.filter((pick) => pick.value >= 90).length,
+        buildRating(final),
+        final.filter((pick) => pick.value >= 90).length,
         quests.done.length + (questDone ? 1 : 0),
         sawPrime || picks.some((pick) => pick.prime),
       );
@@ -627,6 +631,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
               </button>
               <div className="mt-5 space-y-2 text-left text-xs leading-relaxed text-haze">
                 <p>── each round draws a club, then one of its players. take one of his ten stats. ea rating blended with this season&apos;s form.</p>
+                <p>
+                  ── <span className="text-grass">chemistry</span>: clubmates, same nationality, back lines, front lines and more can boost locked stats.
+                </p>
                 <p>
                   ── about {Math.round(data.primeChance * 100)}% of rolls arrive in their <span className="text-gold">prime</span>: peak ea + best form.
                 </p>
@@ -1066,7 +1073,10 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           <div className="flex items-end justify-between border-b border-line px-1 pb-3">
             <div>
               <p className="font-pixel text-[11px] tracking-[0.3em] text-haze">YOUR BUILD</p>
-              <p className="mt-1 text-[10px] text-dim">{taken} / 10 attributes</p>
+              <p className="mt-1 text-[10px] text-dim">
+                {taken} / 10 attributes
+                {chemistry.links.length ? ` · ${chemistry.links.length} chem` : ""}
+              </p>
             </div>
             <div className="text-right">
               <p className={`font-digits text-5xl leading-none lg:text-6xl ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
@@ -1076,24 +1086,42 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           <div className="mt-2 grid grid-cols-5 gap-1 lg:grid-cols-1 lg:gap-1.5">
             {BUILD_STATS.map((definition) => {
               const slot = locked[definition.key];
+              const chem = chemistry.boosts.get(definition.key) ?? 0;
+              const shown = slot ? Math.min(99, slot.value + chem) : null;
               return (
                 <div
                   key={definition.key}
-                  title={slot ? `${definition.label} ${slot.value} · ${slot.playerName}` : definition.label}
-                  className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"}`}
+                  title={slot ? `${definition.label} ${shown}${chem ? ` (+${chem} chem)` : ""} · ${slot.playerName}` : definition.label}
+                  className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"} ${chem ? "border-grass/60" : ""}`}
                 >
                   <div className="min-w-0 text-center lg:text-left">
                     <p className={`font-pixel text-[9px] tracking-[0.12em] lg:text-[10px] lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
                       <span className="lg:hidden">{SHORT_LABEL[definition.key]}</span>
                       <span className="hidden lg:inline">{definition.label.toUpperCase()}</span>
                     </p>
-                    <p className="hidden truncate text-[10px] text-dim lg:block">{slot ? slot.playerName : "open"}</p>
+                    <p className="hidden truncate text-[10px] text-dim lg:block">{slot ? `${slot.playerName}${chem ? ` · +${chem}` : ""}` : "open"}</p>
                   </div>
-                  <p className={`font-digits text-2xl leading-none lg:text-3xl ${slot ? tier(slot.value).text : "text-line"}`}>{slot ? slot.value : "--"}</p>
+                  <p className={`font-digits text-2xl leading-none lg:text-3xl ${shown !== null ? tier(shown).text : "text-line"}`}>{shown ?? "--"}</p>
                 </div>
               );
             })}
           </div>
+          {chemistry.links.length ? (
+            <ul className="mt-3 space-y-1 border-t border-line pt-2">
+              <li className="font-pixel text-[10px] tracking-[0.25em] text-grass">CHEMISTRY</li>
+              {chemistry.links.map((link) => (
+                <li key={link.id} className="flex items-start justify-between gap-2 text-[10px]">
+                  <span>
+                    <span className="text-chalk">{link.title}</span>
+                    <span className="block text-dim">{link.detail.toLowerCase()}</span>
+                  </span>
+                  <span className="shrink-0 font-pixel text-grass">+{link.boost}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-[10px] text-dim">chemistry lights up when clubmates, internationals or a full spine share the build.</p>
+          )}
           <div className="mt-3 flex gap-1" aria-hidden="true">
             {TIERS.map((item) => (
               <span key={item.label} className="flex flex-1 flex-col items-center gap-1">
