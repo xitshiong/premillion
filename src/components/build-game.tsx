@@ -132,7 +132,7 @@ function JerseyBack({
       className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_40%,#123024_0%,#06140e_70%)] p-2 sm:p-3"
       aria-label={`${name} ${shown}, ${teamName}`}
     >
-      <svg viewBox="0 0 120 140" className="h-full max-h-full w-auto drop-shadow-[0_8px_18px_rgba(0,0,0,0.55)]" role="img">
+      <svg viewBox="0 0 160 150" className="h-full max-h-full w-auto drop-shadow-[0_8px_18px_rgba(0,0,0,0.55)]" role="img">
         <defs>
           {kit.stripe ? (
             <pattern id={fillId} width="10" height="10" patternUnits="userSpaceOnUse">
@@ -142,62 +142,66 @@ function JerseyBack({
           ) : (
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={kit.primary} />
-              <stop offset="100%" stopColor={kit.primary} stopOpacity="0.88" />
+              <stop offset="100%" stopColor={kit.primary} stopOpacity="0.9" />
             </linearGradient>
           )}
         </defs>
 
-        {/* shirt body + sleeves silhouette */}
+        {/* Classic flat football shirt: wide short sleeves + torso */}
         <path
-          d="M38 18
-             C42 10, 48 6, 54 4
-             L60 14
-             L66 4
-             C72 6, 78 10, 82 18
-             L108 34
-             L100 58
-             L86 48
-             L86 128
-             L34 128
-             L34 48
-             L20 58
-             L12 34
+          d="M52 22
+             L58 8
+             L68 18
+             L80 18
+             L90 8
+             L96 22
+             L148 40
+             L138 72
+             L112 58
+             L112 138
+             L48 138
+             L48 58
+             L22 72
+             L12 40
              Z"
           fill={`url(#${fillId})`}
           stroke={kit.secondary}
-          strokeWidth="1.6"
+          strokeWidth="2"
           strokeLinejoin="round"
         />
 
-        {/* collar opening */}
-        <path d="M54 4 L60 16 L66 4" fill="none" stroke={kit.secondary} strokeWidth="1.4" strokeLinejoin="round" />
-        <ellipse cx="60" cy="10" rx="9" ry="5" fill="#06140e" />
+        {/* neck hole */}
+        <ellipse cx="80" cy="16" rx="12" ry="7" fill="#06140e" />
+        <path d="M68 18 Q80 28 92 18" fill="none" stroke={kit.secondary} strokeWidth="1.5" />
 
-        {/* sleeve cuffs */}
-        <path d="M12 34 L20 58" fill="none" stroke={kit.secondary} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
-        <path d="M108 34 L100 58" fill="none" stroke={kit.secondary} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+        {/* sleeve ends */}
+        <path d="M12 40 L22 72" fill="none" stroke={kit.secondary} strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M148 40 L138 72" fill="none" stroke={kit.secondary} strokeWidth="2.4" strokeLinecap="round" />
+
+        {/* side seams */}
+        <path d="M48 58 L48 138" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.35" />
+        <path d="M112 58 L112 138" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.35" />
 
         {/* hem */}
-        <path d="M34 128 L86 128" fill="none" stroke={kit.secondary} strokeWidth="1.4" opacity="0.55" />
+        <path d="M48 138 L112 138" fill="none" stroke={kit.secondary} strokeWidth="1.6" opacity="0.6" />
 
-        {/* name + number on the back panel */}
         <text
-          x="60"
-          y="46"
+          x="80"
+          y="52"
           textAnchor="middle"
           fill={kit.number}
           fontSize={nameSize}
-          letterSpacing="1.2"
+          letterSpacing="1.4"
           style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
         >
           {name}
         </text>
         <text
-          x="60"
-          y="92"
+          x="80"
+          y="100"
           textAnchor="middle"
           fill={kit.number}
-          fontSize={shown.length > 1 ? 42 : 48}
+          fontSize={shown.length > 1 ? 44 : 52}
           style={{ fontFamily: "var(--nf-condensed), Arial Narrow, sans-serif", fontWeight: 700 }}
         >
           {shown}
@@ -205,13 +209,13 @@ function JerseyBack({
 
         {prime ? (
           <g>
-            <rect x="40" y="112" width="40" height="9" fill="#ff5a3c" />
+            <rect x="58" y="118" width="44" height="10" fill="#ff5a3c" />
             <text
-              x="60"
-              y="119"
+              x="80"
+              y="126"
               textAnchor="middle"
               fill="#06140e"
-              fontSize="6"
+              fontSize="6.5"
               letterSpacing="1.5"
               style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
             >
