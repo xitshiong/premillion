@@ -5,6 +5,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { BookOpen, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { PixelStadium } from "@/components/pixel-stadium";
+import {
+  ACTIVE_QUESTS,
+  questById,
+  questProgress,
+  rerollText,
+  rewardText,
+  seasonBonus,
+  shuffledQuestIds,
+  type ActiveQuest,
+  type DoneQuest,
+  type PickRecord,
+  type Reward,
+} from "@/lib/quests";
 import { BUILD_STATS, buildRating, clubWithUser, strengthFrom, type ClubRating, type GameData, type RollPlayer, type RollStat } from "@/lib/ratings";
 import { muteStore, sfx } from "@/lib/sfx";
 import { mulberry32, simulateSeason, tableAt, type MatchResult } from "@/lib/simulate";
@@ -13,6 +26,7 @@ const PLAYER_REROLLS = 8;
 const TEAM_REROLLS = 6;
 const TICK_MS = 70;
 const WEEK_MS = 150;
+const NO_REWARD: Reward = { team: 0, player: 0 };
 
 const ROUND_LINES = [
   "first pull. no pressure.",
@@ -27,9 +41,24 @@ const ROUND_LINES = [
   "last pull. make it count.",
 ];
 
-type LockedStat = RollStat & { playerId: number; playerName: string; teamName: string };
+const SHORT_LABEL: Record<string, string> = {
+  pac: "PAC",
+  sho: "SHO",
+  pas: "PAS",
+  dri: "DRI",
+  def: "DEF",
+  phy: "PHY",
+  finishing: "FIN",
+  vision: "VIS",
+  reactions: "REA",
+  headingAccuracy: "HEA",
+};
+
 type Spin = { kind: "team" | "player" | "club"; title: string; subtitle: string };
 type Phase = "intro" | "build" | "season";
+type QuestState = { active: ActiveQuest[]; queue: string[]; done: DoneQuest[] };
+type Toast = { id: number; title: string; reward: Reward; banked: boolean };
+type RunRecord = { place: number; clubName: string; rating: number };
 
 const TIERS = [
   { min: 90, label: "World class", text: "text-tier-world", bg: "bg-tier-world" },
@@ -49,6 +78,15 @@ function pick<T>(list: T[], random: () => number = Math.random) {
 
 function newSeed() {
   return Math.floor(Math.random() * 1_000_000_000);
+}
+
+function freshQuests(random: () => number): QuestState {
+  const ids = shuffledQuestIds(random);
+  return { active: ids.slice(0, ACTIVE_QUESTS).map((id) => ({ id, since: 0 })), queue: ids.slice(ACTIVE_QUESTS), done: [] };
+}
+
+function addReward(a: Reward, b: Reward): Reward {
+  return { team: a.team + b.team, player: a.player + b.player };
 }
 
 function ordinal(place: number) {
@@ -77,17 +115,17 @@ function Portrait({ url, name }: { url: string | null; name: string }) {
       .map((part) => part[0])
       .slice(0, 2)
       .join("");
-    return <p className="absolute inset-0 grid place-items-center font-pixel text-6xl text-line">{initials}</p>;
+    return <p className="absolute inset-0 grid place-items-center font-pixel text-4xl text-line lg:text-6xl">{initials}</p>;
   }
   return <Image src={url} alt={name} fill unoptimized loading="eager" sizes="280px" className="object-contain object-bottom" onError={() => setFailed(true)} />;
 }
 
-function Key({ children }: { children: React.ReactNode }) {
-  return <span className="inline-grid h-5 min-w-5 place-items-center border border-line bg-night px-1 font-ui text-[10px] text-haze">{children}</span>;
+function Key({ children, className = "inline-grid" }: { children: React.ReactNode; className?: string }) {
+  return <span className={`h-5 min-w-5 place-items-center border border-line bg-night px-1 font-ui text-[10px] text-haze ${className}`}>{children}</span>;
 }
 
 function IconButton({ label, onClick, href, children }: { label: string; onClick?: () => void; href?: string; children: React.ReactNode }) {
-  const className = "grid size-9 place-items-center border border-line bg-stand text-haze transition hover:border-flood hover:text-flood";
+  const className = "grid size-8 shrink-0 place-items-center sm:size-9 border border-line bg-stand text-haze transition hover:border-flood hover:text-flood";
   if (href) {
     return (
       <Link href={href} aria-label={label} title={label} className={className}>
@@ -100,6 +138,10 @@ function IconButton({ label, onClick, href, children }: { label: string; onClick
       {children}
     </button>
   );
+}
+
+function RewardChip({ reward, muted = false }: { reward: Reward; muted?: boolean }) {
+  return <span className={`shrink-0 font-pixel text-[9px] tracking-[0.12em] ${muted ? "text-dim" : "text-gold"}`}>{rewardText(reward).toUpperCase()}</span>;
 }
 
 export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
@@ -120,16 +162,23 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   });
   const [rollCount, setRollCount] = useState(0);
   const [spin, setSpin] = useState<Spin | null>(null);
-  const [locked, setLocked] = useState<Record<string, LockedStat>>({});
-  const [lastPick, setLastPick] = useState<LockedStat | null>(null);
+  const [locked, setLocked] = useState<Record<string, PickRecord>>({});
+  const [lastPick, setLastPick] = useState<PickRecord | null>(null);
   const [playerRerolls, setPlayerRerolls] = useState(PLAYER_REROLLS);
   const [teamRerolls, setTeamRerolls] = useState(TEAM_REROLLS);
+  const [quests, setQuests] = useState<QuestState>(() => freshQuests(mulberry32(seed ^ 0x5eed)));
+  const [lastRerollAt, setLastRerollAt] = useState(0);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [bank, setBank] = useState<Reward>(NO_REWARD);
   const [club, setClub] = useState<ClubRating | null>(null);
   const [season, setSeason] = useState<{ matches: MatchResult[] } | null>(null);
   const [week, setWeek] = useState(0);
+  const [seasonNote, setSeasonNote] = useState<{ reward: Reward; fresh: boolean } | null>(null);
+  const [runs, setRuns] = useState<RunRecord[]>([]);
   const [denied, setDenied] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const weekTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const bonusPaid = useRef(false);
   const muted = useSyncExternalStore(muteStore.subscribe, muteStore.get, muteStore.getServer);
 
   useEffect(
@@ -145,6 +194,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   const round = Math.min(taken + 1, 10);
   const spinning = spin !== null;
   const clubPool = byClub.get(rolled.teamId) ?? [];
+  const lockedStats = Object.values(locked);
+  const rating = buildRating(lockedStats);
+  const profile = complete ? strengthFrom(lockedStats) : null;
 
   const runSpin = useCallback((frames: (() => Spin)[], land: () => void, sound: "tick" | "drum" = "tick") => {
     if (timer.current) clearInterval(timer.current);
@@ -198,27 +250,90 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     setDenied((count) => count + 1);
   }
 
-  function kickOff() {
+  function stopTimers() {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+    if (weekTimer.current) clearInterval(weekTimer.current);
+    weekTimer.current = null;
+  }
+
+  function startRun() {
+    stopTimers();
+    setSpin(null);
+    setLocked({});
+    setLastPick(null);
+    setTeamRerolls(TEAM_REROLLS + bank.team);
+    setPlayerRerolls(PLAYER_REROLLS + bank.player);
+    setBank(NO_REWARD);
+    setQuests(freshQuests(mulberry32(newSeed())));
+    setLastRerollAt(0);
+    setToast(null);
+    setClub(null);
+    setSeason(null);
+    setSeasonNote(null);
+    setWeek(0);
+    bonusPaid.current = false;
     setPhase("build");
-    sfx().play("kickoff");
     rollFreshTeam();
+  }
+
+  function kickOff() {
+    sfx().play("kickoff");
+    if (taken > 0 || season) {
+      setPhase(season ? "season" : "build");
+      return;
+    }
+    setPhase("build");
+    rollFreshTeam();
+  }
+
+  function settleQuests(picks: PickRecord[], buildDone: boolean) {
+    const finished = quests.active.filter((quest) => questProgress(quest, picks, lastRerollAt) >= questById(quest.id).target);
+    if (!finished.length) return false;
+    const reward = finished.reduce((sum, quest) => addReward(sum, questById(quest.id).reward), NO_REWARD);
+    if (buildDone) setBank((current) => addReward(current, reward));
+    else {
+      setTeamRerolls((count) => count + reward.team);
+      setPlayerRerolls((count) => count + reward.player);
+    }
+    const queue = [...quests.queue];
+    const active = quests.active.map((quest) => (finished.includes(quest) ? (queue.length ? { id: queue.shift()!, since: picks.length } : null) : quest)).filter((quest): quest is ActiveQuest => quest !== null);
+    setQuests({ active, queue, done: [...quests.done, ...finished.map((quest) => ({ id: quest.id, at: picks.length, banked: buildDone }))] });
+    setToast({ id: quests.done.length + picks.length * 100, title: finished.map((quest) => questById(quest.id).title).join(" + "), reward, banked: buildDone });
+    setTimeout(() => sfx().play("quest"), 220);
+    return true;
   }
 
   function choose(stat: RollStat) {
     if (phase !== "build" || spinning || complete) return;
     if (locked[stat.key]) return deny();
-    const entry = { ...stat, playerId: rolled.id, playerName: rolled.name, teamName: rolled.teamName };
+    const entry: PickRecord = {
+      ...stat,
+      order: taken,
+      playerId: rolled.id,
+      playerName: rolled.name,
+      teamId: rolled.teamId,
+      teamName: rolled.teamName,
+      role: rolled.role,
+      position: rolled.position,
+      overall: rolled.overall,
+      goals: rolled.goals,
+      assists: rolled.assists,
+    };
     const next = { ...locked, [stat.key]: entry };
+    const picks = Object.values(next);
     setLocked(next);
     setLastPick(entry);
     sfx().play(stat.value >= 90 ? "pick-world" : stat.value >= 85 ? "pick-elite" : "pick");
-    if (Object.keys(next).length < 10) setTimeout(() => rollFreshTeam(), 260);
+    const questDone = settleQuests(picks, picks.length === 10);
+    if (picks.length < 10) setTimeout(() => rollFreshTeam(), questDone ? 650 : 260);
   }
 
   function rerollPlayer() {
     if (phase !== "build" || spinning || complete) return;
     if (playerRerolls <= 0 || clubPool.length < 2) return deny();
     setPlayerRerolls((count) => count - 1);
+    setLastRerollAt(taken);
     const nextPlayer = pick(clubPool.filter((player) => player.id !== rolled.id));
     sfx().play("whoosh");
     runSpin(playerFrames(clubPool, nextPlayer, 10), () => {
@@ -231,6 +346,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     if (phase !== "build" || spinning || complete) return;
     if (teamRerolls <= 0) return deny();
     setTeamRerolls((count) => count - 1);
+    setLastRerollAt(taken);
     rollFreshTeam(rolled.teamId);
   }
 
@@ -250,61 +366,68 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     );
   }
 
-  function stopWeeks() {
+  function finishSeason(matches: MatchResult[], signed: ClubRating) {
     if (weekTimer.current) clearInterval(weekTimer.current);
     weekTimer.current = null;
-  }
-
-  function finishSeason(matches: MatchResult[], clubId: number) {
-    stopWeeks();
     setWeek(38);
-    const place = tableAt(data.clubs, matches, 38).findIndex((row) => row.id === clubId) + 1;
+    const place = tableAt(data.clubs, matches, 38).findIndex((row) => row.id === signed.id) + 1;
     sfx().play(verdict(place).sound);
+    setRuns((list) => [...list, { place, clubName: signed.name, rating }]);
+    if (bonusPaid.current) {
+      setSeasonNote({ reward: NO_REWARD, fresh: false });
+      return;
+    }
+    bonusPaid.current = true;
+    const reward = seasonBonus(place);
+    setBank((current) => addReward(current, reward));
+    setSeasonNote({ reward, fresh: true });
   }
 
   function playSeason() {
     if (!club || !profile) return;
+    const signed = club;
     const result = simulateSeason({
       clubs: data.clubs,
-      userClubId: club.id,
+      userClubId: signed.id,
       userAttack: profile.attack,
       userDefense: profile.defense,
       goalsPerTeamGame: data.goalsPerTeamGame,
       seed: newSeed(),
     });
+    stopTimers();
     setSeason({ matches: result.matches });
+    setSeasonNote(null);
     setPhase("season");
     setWeek(0);
     sfx().play("kickoff");
-    stopWeeks();
     let current = 0;
     weekTimer.current = setInterval(() => {
       current += 1;
-      if (current >= 38) return finishSeason(result.matches, club.id);
+      if (current >= 38) return finishSeason(result.matches, signed);
       setWeek(current);
-      const match = result.matches.find((item) => item.week === current && (item.home === club.id || item.away === club.id));
+      const match = result.matches.find((item) => item.week === current && (item.home === signed.id || item.away === signed.id));
       if (match) {
-        const home = match.home === club.id;
+        const home = match.home === signed.id;
         const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
         sfx().play(diff > 0 ? "win" : diff < 0 ? "loss" : "draw");
       }
     }, WEEK_MS);
   }
 
-  function restart() {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
-    stopWeeks();
-    setSpin(null);
-    setLocked({});
-    setLastPick(null);
-    setPlayerRerolls(PLAYER_REROLLS);
-    setTeamRerolls(TEAM_REROLLS);
+  function tryAnotherClub() {
+    stopTimers();
     setClub(null);
     setSeason(null);
+    setSeasonNote(null);
     setWeek(0);
     setPhase("build");
-    rollFreshTeam();
+    rollClub();
+  }
+
+  function afterSeason(choice: string) {
+    if (choice === "N") startRun();
+    else if (choice === "R") playSeason();
+    else if (choice === "C") tryAnotherClub();
   }
 
   useEffect(() => {
@@ -316,6 +439,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
         return kickOff();
       }
       if (key === "m") return muteStore.toggle();
+      if (phase === "season" && week >= 38) return afterSeason(key.toUpperCase());
       if (phase !== "build") return;
       if (key === "t") return rerollTeam();
       if (key === "y") return rerollPlayer();
@@ -328,37 +452,36 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const lockedStats = Object.values(locked);
-  const rating = buildRating(lockedStats);
-  const profile = complete ? strengthFrom(lockedStats) : null;
   const lineup = club && profile ? clubWithUser(club, profile) : null;
   const replaced = lineup?.replacedId ? playerById.get(lineup.replacedId) : undefined;
   const rollSpin = spin && spin.kind !== "club" ? spin : null;
+  const bestRun = runs.reduce<RunRecord | null>((best, run) => (!best || run.place < best.place ? run : best), null);
+  const hasBank = bank.team > 0 || bank.player > 0;
 
   const header = (
-    <header className="relative z-10 border-b border-line bg-night/90 backdrop-blur">
-      <div className="mx-auto flex max-w-[1260px] items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
-        <button type="button" onClick={() => setPhase("intro")} className="title-split font-pixel text-lg tracking-[0.12em] text-chalk sm:text-xl">
+    <header className="sticky top-0 z-30 border-b border-line bg-night/90 backdrop-blur">
+      <div className="mx-auto flex max-w-[1320px] 2xl:max-w-[1560px] items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-5">
+        <button type="button" onClick={() => setPhase("intro")} className="title-split shrink-0 font-pixel text-sm tracking-[0.04em] text-chalk sm:text-xl sm:tracking-[0.12em]">
           FRANKENBALLER
         </button>
         {phase === "build" ? (
-          <div className="hidden text-center md:block">
-            <p className="font-pixel text-sm tracking-[0.3em] text-chalk">
-              ROUND {round} / 10
+          <div className="min-w-0 text-center">
+            <p className="font-pixel text-[9px] tracking-[0.12em] whitespace-nowrap text-chalk sm:text-sm sm:tracking-[0.3em]">
+              {complete ? "BUILT" : `ROUND ${round}/10`}
             </p>
-            <div className="mt-1 flex justify-center gap-1">
+            <div className="mt-1 flex justify-center gap-0.5 sm:gap-1">
               {Array.from({ length: 10 }, (_, index) => (
-                <span key={index} className={`h-1.5 w-4 ${index < taken ? "bg-flood" : index === taken && !complete ? "animate-blink bg-flood/50" : "bg-line"}`} />
+                <span key={index} className={`h-1.5 w-1.5 sm:w-4 ${index < taken ? "bg-flood" : index === taken && !complete ? "animate-blink bg-flood/50" : "bg-line"}`} />
               ))}
             </div>
           </div>
         ) : null}
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
           <IconButton label={muted ? "Sound off (M)" : "Sound on (M)"} onClick={() => muteStore.toggle()}>
             {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
           </IconButton>
           {phase !== "intro" ? (
-            <IconButton label="Start a new player" onClick={restart}>
+            <IconButton label="Start a new run" onClick={startRun}>
               <RotateCcw className="size-4" />
             </IconButton>
           ) : null}
@@ -370,36 +493,46 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     </header>
   );
 
+  const toastNode = toast ? (
+    <div key={toast.id} className="animate-toast pointer-events-none fixed top-16 left-1/2 z-40 w-[min(92vw,420px)] border border-gold bg-night/95 px-4 py-3 text-center shadow-[0_0_24px_rgba(255,209,102,0.35)]">
+      <p className="font-pixel text-[10px] tracking-[0.3em] text-gold">QUEST COMPLETE</p>
+      <p className="mt-1 font-pixel text-sm tracking-[0.12em] text-chalk">{toast.title.toUpperCase()}</p>
+      <p className="mt-1 text-[11px] text-haze">
+        {rerollText(toast.reward)}
+        {toast.banked ? " · banked for your next run" : ""}
+      </p>
+    </div>
+  ) : null;
+
   if (phase === "intro") {
     return (
       <div className="crt relative flex min-h-screen flex-col overflow-hidden bg-night font-ui text-chalk">
         {header}
         <div className="relative flex flex-1 flex-col">
           <div className="relative">
-            <PixelStadium className="h-[46vh] min-h-[260px]" />
+            <PixelStadium className="h-[38vh] min-h-[220px] sm:h-[46vh] sm:min-h-[260px]" />
             <div className="absolute inset-x-0 top-[8%] px-4 text-center">
-              <h1 className="title-split animate-flicker font-pixel text-[13vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">FRANKENBALLER</h1>
-              <p className="mt-4 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-xs tracking-[0.5em] text-flood sm:text-sm">THE {data.season} BUILD</p>
+              <h1 className="title-split animate-flicker font-pixel text-[12vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">FRANKENBALLER</h1>
+              <p className="mt-4 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-[10px] tracking-[0.4em] text-flood sm:text-sm sm:tracking-[0.5em]">THE {data.season} BUILD</p>
             </div>
           </div>
-          <div className="relative mx-auto w-full max-w-xl flex-1 px-4 pt-8 pb-10 text-center">
+          <div className="relative mx-auto w-full max-w-xl flex-1 px-4 pt-7 pb-10 text-center">
             <p className="text-sm text-haze">
               ten real premier league players · one attribute from each · <span className="text-chalk">38 matchweeks to prove it</span>
             </p>
-            <button
-              type="button"
-              onClick={kickOff}
-              className="glow-flood mt-7 w-full bg-turf py-4 font-pixel text-lg tracking-[0.3em] text-chalk transition hover:bg-stand"
-            >
-              ▶ KICK OFF ◀
+            <button type="button" onClick={kickOff} className="glow-flood mt-6 w-full bg-turf py-4 font-pixel text-lg tracking-[0.3em] text-chalk transition hover:bg-stand">
+              ▶ {taken > 0 || season ? "RESUME" : "KICK OFF"} ◀
             </button>
             <div className="mt-6 space-y-2 text-left text-xs leading-relaxed text-haze">
               <p>── each round draws a club, then one of its players. take one of his ten EA FC ratings. pace from one, finishing from another.</p>
               <p>── reroll team for a new club. reroll player to stay at the same club.</p>
+              <p>
+                ── <span className="text-gold">quests</span> pay out extra rerolls. finish in the top seven and you bank more for the next run.
+              </p>
               <p>── only lads who actually play: at least 270 league minutes this season. {data.firstTeam} first-teamers, {data.bench} off the bench.</p>
               <p>── then you sign for a random club and we play the whole season.</p>
             </div>
-            <p className="mt-8 text-[10px] tracking-[0.2em] text-dim uppercase">enter to start · m to mute · sound recommended</p>
+            <p className="mt-8 hidden text-[10px] tracking-[0.2em] text-dim uppercase sm:block">enter to start · m to mute · sound recommended</p>
           </div>
         </div>
         <footer className="border-t border-line px-4 py-3 text-center text-[10px] tracking-wide text-dim">
@@ -417,92 +550,146 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     const shown = mine.filter((match) => match.week <= week);
     const latest = shown[shown.length - 1];
     const end = verdict(place);
+    const record = shown.reduce(
+      (sum, match) => {
+        const home = match.home === club.id;
+        const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
+        return diff > 0 ? { ...sum, w: sum.w + 1 } : diff < 0 ? { ...sum, l: sum.l + 1 } : { ...sum, d: sum.d + 1 };
+      },
+      { w: 0, d: 0, l: 0 },
+    );
+    const options = [
+      { key: "N", title: "NEW RUN", detail: `fresh build · ${TEAM_REROLLS + bank.team} team / ${PLAYER_REROLLS + bank.player} player rerolls`, glow: "glow-kit" },
+      { key: "R", title: "RUN IT BACK", detail: "same build, same club, new season", glow: "glow-flood" },
+      { key: "C", title: "NEW CLUB", detail: "same build, roll another club", glow: "glow-flood" },
+    ];
     return (
       <div className="crt min-h-screen bg-night font-ui text-chalk">
         {header}
-        <div className="mx-auto grid max-w-[1260px] gap-3 px-3 py-4 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-4">
-          <section className="pixel-frame bg-turf p-4 sm:p-6">
-            <p className="font-pixel text-xs tracking-[0.3em] text-flood">{club.name.toUpperCase()}</p>
-            <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-xs text-haze uppercase">{done ? "full time" : `matchweek ${week} / 38`}</p>
-                <p className={`font-digits text-8xl leading-none ${done ? end.color : "text-chalk"}`}>{place ? ordinal(place) : "—"}</p>
-              </div>
-              {latest && !done ? (
-                <p key={latest.week} className="animate-tile-in font-digits text-3xl text-haze">
-                  {shortName.get(latest.home)} {latest.homeGoals}–{latest.awayGoals} {shortName.get(latest.away)}
+        <div className="mx-auto grid max-w-[1320px] 2xl:max-w-[1560px] gap-3 px-3 py-3 sm:py-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:px-5">
+          <div className="flex min-w-0 flex-col gap-3">
+            <section className="pixel-frame bg-turf p-4 sm:p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p className="font-pixel text-xs tracking-[0.3em] text-flood">{club.name.toUpperCase()}</p>
+                <p className="text-[11px] text-dim">
+                  build <span className={tier(rating).text}>{rating}</span> · attack {profile?.attack.toFixed(1)} · defence {profile?.defense.toFixed(1)}
                 </p>
-              ) : null}
-              {!done ? (
-                <button type="button" onClick={() => finishSeason(season.matches, club.id)} className="border border-line px-3 py-1.5 font-pixel text-xs tracking-[0.2em] text-haze hover:border-flood hover:text-flood">
-                  SKIP ▶▶
-                </button>
-              ) : null}
-            </div>
-            {done ? (
-              <div className="animate-card-pop mt-4">
-                <p className={`title-split font-pixel text-3xl tracking-[0.12em] sm:text-4xl ${end.color}`}>{end.title.toUpperCase()}</p>
-                <p className="mt-1 text-sm text-haze">── {end.line}</p>
               </div>
-            ) : null}
-
-            <div className="mt-5 flex flex-wrap gap-1" aria-label="Form">
-              {mine.map((match) => {
-                const home = match.home === club.id;
-                const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
-                const played = match.week <= week;
-                return (
-                  <span
-                    key={match.week}
-                    title={`W${match.week} ${home ? "vs" : "at"} ${shortName.get(home ? match.away : match.home)} ${match.homeGoals}–${match.awayGoals}`}
-                    className={`size-3.5 ${!played ? "bg-line/60" : diff > 0 ? "bg-grass" : diff < 0 ? "bg-kit" : "bg-gold"}`}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="mt-5 grid max-h-[22rem] gap-1 overflow-y-auto pr-1 sm:grid-cols-2">
-              {[...shown].reverse().map((match) => {
-                const home = match.home === club.id;
-                const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
-                return (
-                  <p key={match.week} className="flex items-center justify-between border border-line bg-night/60 px-3 py-1 text-xs">
-                    <span className="text-dim">MW{match.week}</span>
-                    <span>
-                      {home ? "vs" : "at"} {shortName.get(home ? match.away : match.home)}
-                    </span>
-                    <span className={`font-digits text-lg ${diff > 0 ? "text-grass" : diff < 0 ? "text-kit" : "text-gold"}`}>
-                      {match.homeGoals}–{match.awayGoals}
-                    </span>
+              <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs text-haze uppercase">{done ? "full time" : `matchweek ${week} / 38`}</p>
+                  <p className={`font-digits text-7xl leading-none sm:text-8xl ${done ? end.color : "text-chalk"}`}>{place ? ordinal(place) : "—"}</p>
+                  <p className="mt-1 font-digits text-xl text-haze">
+                    <span className="text-grass">{record.w}W</span> <span className="text-gold">{record.d}D</span> <span className="text-kit">{record.l}L</span> · {table[place - 1]?.points ?? 0} pts
                   </p>
-                );
-              })}
-            </div>
+                </div>
+                {!done ? (
+                  <div className="flex flex-col items-end gap-2">
+                    {latest ? (
+                      <p key={latest.week} className="animate-tile-in font-digits text-3xl text-haze">
+                        {shortName.get(latest.home)} {latest.homeGoals}–{latest.awayGoals} {shortName.get(latest.away)}
+                      </p>
+                    ) : null}
+                    <button type="button" onClick={() => finishSeason(season.matches, club)} className="border border-line px-3 py-1.5 font-pixel text-xs tracking-[0.2em] text-haze hover:border-flood hover:text-flood">
+                      SKIP ▶▶
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {done ? (
+                <div className="animate-card-pop mt-4">
+                  <p className={`title-split font-pixel text-2xl tracking-[0.12em] sm:text-4xl ${end.color}`}>{end.title.toUpperCase()}</p>
+                  <p className="mt-1 text-sm text-haze">── {end.line}</p>
+                </div>
+              ) : null}
+              <div className="mt-5 grid grid-cols-[repeat(19,minmax(0,1fr))] gap-1 sm:flex sm:flex-wrap" aria-label="Form">
+                {mine.map((match) => {
+                  const home = match.home === club.id;
+                  const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
+                  const played = match.week <= week;
+                  return (
+                    <span
+                      key={match.week}
+                      title={`W${match.week} ${home ? "vs" : "at"} ${shortName.get(home ? match.away : match.home)} ${match.homeGoals}–${match.awayGoals}`}
+                      className={`aspect-square sm:size-3.5 ${!played ? "bg-line/60" : diff > 0 ? "bg-grass" : diff < 0 ? "bg-kit" : "bg-gold"}`}
+                    />
+                  );
+                })}
+              </div>
+            </section>
 
             {done ? (
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button type="button" onClick={playSeason} className="glow-flood bg-turf px-4 py-2.5 font-pixel text-sm tracking-[0.2em] hover:bg-stand">
-                  RUN IT BACK
-                </button>
-                <button type="button" onClick={restart} className="glow-kit bg-turf px-4 py-2.5 font-pixel text-sm tracking-[0.2em] hover:bg-stand">
-                  NEW PLAYER
-                </button>
-              </div>
+              <section className="animate-card-pop pixel-frame border-gold/40 bg-turf p-4 sm:p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="font-pixel text-sm tracking-[0.3em] text-chalk">WHAT NOW?</p>
+                  <p className="text-[11px] text-dim">
+                    season {runs.length} this session{bestRun ? ` · best ${ordinal(bestRun.place)} with ${bestRun.clubName}` : ""}
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {options.map((option) => (
+                    <button key={option.key} type="button" onClick={() => afterSeason(option.key)} className={`${option.glow} group flex items-center justify-between gap-3 bg-stand px-4 py-3 text-left transition hover:-translate-y-0.5 hover:bg-[#13223b] sm:flex-col sm:items-start`}>
+                      <span>
+                        <span className="block font-pixel text-sm tracking-[0.2em] text-chalk">{option.title}</span>
+                        <span className="mt-1 block text-[11px] text-haze">{option.detail}</span>
+                      </span>
+                      <Key className="hidden sm:inline-grid">{option.key}</Key>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11px] text-haze">
+                  {seasonNote?.fresh ? (
+                    seasonNote.reward.team + seasonNote.reward.player > 0 ? (
+                      <>
+                        season bonus banked for your next run: <span className="text-gold">{rerollText(seasonNote.reward)}</span>.
+                      </>
+                    ) : (
+                      "no season bonus this time. finish top seven to bank extra rerolls."
+                    )
+                  ) : (
+                    "this build already paid its season bonus. a new run can earn another."
+                  )}
+                  {hasBank ? <span className="text-dim"> total banked: {rewardText(bank)}.</span> : null}
+                </p>
+              </section>
             ) : null}
-            <p className="mt-5 max-w-2xl text-[11px] leading-relaxed text-dim">
-              how it works: each club is rated from the EA ratings of its {data.coreSize} most-used outfielders, and you replace the weakest of {club.name}&apos;s. attack is pace, shooting, passing, dribbling, finishing and vision. defence is defending, physical, reactions and heading. a match turns those into expected goals around {data.goalsPerTeamGame.toFixed(2)} a side (this season&apos;s real scoring rate), home sides get a 10% bump, and the score is drawn at random. a simulation, not a prediction.
-            </p>
-          </section>
 
-          <section className="pixel-frame bg-turf p-3">
-            <table className="w-full text-xs">
+            <section className="pixel-frame bg-turf p-3 sm:p-4">
+              <p className="mb-2 font-pixel text-[10px] tracking-[0.3em] text-haze">RESULTS</p>
+              <div className="grid max-h-64 gap-1 overflow-y-auto pr-1 sm:grid-cols-2 lg:max-h-[19rem]">
+                {[...shown].reverse().map((match) => {
+                  const home = match.home === club.id;
+                  const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
+                  return (
+                    <p key={match.week} className="flex items-center justify-between border border-line bg-night/60 px-3 py-1 text-xs">
+                      <span className="w-10 text-dim">MW{match.week}</span>
+                      <span className="flex-1 text-center">
+                        {home ? "vs" : "at"} {shortName.get(home ? match.away : match.home)}
+                      </span>
+                      <span className={`font-digits text-lg ${diff > 0 ? "text-grass" : diff < 0 ? "text-kit" : "text-gold"}`}>
+                        {match.homeGoals}–{match.awayGoals}
+                      </span>
+                    </p>
+                  );
+                })}
+                {!shown.length ? <p className="text-xs text-dim">kick-off…</p> : null}
+              </div>
+              <p className="mt-4 max-w-2xl text-[11px] leading-relaxed text-dim">
+                how it works: each club is rated from the EA ratings of its {data.coreSize} most-used outfielders, and you replace the weakest of {club.name}&apos;s. attack is pace, shooting, passing, dribbling, finishing and vision. defence is defending, physical, reactions and heading. a match turns those into expected goals around {data.goalsPerTeamGame.toFixed(2)} a side (this season&apos;s real scoring rate), home sides get a 10% bump, and the score is drawn at random. a simulation, not a prediction.
+              </p>
+            </section>
+          </div>
+
+          <section className="pixel-frame self-start bg-turf p-3 lg:sticky lg:top-16">
+            <p className="mb-1 px-1.5 font-pixel text-[10px] tracking-[0.3em] text-haze">TABLE</p>
+            <table className="w-full table-fixed text-xs">
               <thead className="text-dim">
                 <tr>
-                  {["", "club", "p", "gd", "pts"].map((heading) => (
-                    <th key={heading} className="px-1.5 py-1 text-left font-normal uppercase">
-                      {heading}
-                    </th>
-                  ))}
+                  <th className="w-7 px-1.5 py-1 text-left font-normal" />
+                  <th className="px-1.5 py-1 text-left font-normal uppercase">club</th>
+                  <th className="w-8 px-1.5 py-1 text-right font-normal uppercase">p</th>
+                  <th className="w-10 px-1.5 py-1 text-right font-normal uppercase">gd</th>
+                  <th className="w-10 px-1.5 py-1 text-right font-normal uppercase">pts</th>
                 </tr>
               </thead>
               <tbody>
@@ -513,106 +700,182 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   return (
                     <tr key={row.id} className={`border-l-2 ${zone} ${yours ? "bg-flood/15 text-flood" : "text-chalk/85"}`}>
                       <td className="px-1.5 py-1 font-digits text-base text-dim">{index + 1}</td>
-                      <td className="truncate px-1.5 py-1">{row.name}</td>
-                      <td className="px-1.5 py-1 tabular-nums">{row.played}</td>
-                      <td className="px-1.5 py-1 tabular-nums">{diff > 0 ? `+${diff}` : diff}</td>
-                      <td className="px-1.5 py-1 font-digits text-lg leading-none">{row.points}</td>
+                      <td className="truncate px-1.5 py-1">
+                        <span className="sm:hidden">{row.abbr || row.name}</span>
+                        <span className="hidden sm:inline">{row.name}</span>
+                      </td>
+                      <td className="px-1.5 py-1 text-right tabular-nums">{row.played}</td>
+                      <td className="px-1.5 py-1 text-right tabular-nums">{diff > 0 ? `+${diff}` : diff}</td>
+                      <td className="px-1.5 py-1 text-right font-digits text-lg leading-none">{row.points}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1.5 text-[10px] text-dim">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-0.5 bg-gold" /> champions
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-0.5 bg-flood" /> champions league
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-0.5 bg-kit" /> relegation
+              </span>
+            </div>
           </section>
         </div>
       </div>
     );
   }
 
+  const rerollButtons = (compact: boolean) => (
+    <>
+      <button
+        type="button"
+        onClick={rerollTeam}
+        disabled={spinning || teamRerolls <= 0}
+        className={`glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        title="New club and a new player from it"
+      >
+        {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-xl leading-none text-flood">{teamRerolls}</span>
+        {compact ? null : <Key>T</Key>}
+      </button>
+      <button
+        type="button"
+        onClick={rerollPlayer}
+        disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
+        className={`glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        title={`Another ${rolled.teamName} player`}
+      >
+        {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-xl leading-none text-kit">{playerRerolls}</span>
+        {compact ? null : <Key>Y</Key>}
+      </button>
+    </>
+  );
+
+  const latestDone = quests.done[quests.done.length - 1];
+
   return (
-    <div className="crt min-h-screen bg-night font-ui text-chalk">
+    <div className="crt min-h-screen bg-night pb-24 font-ui text-chalk lg:pb-0">
       {header}
-      <div className="relative">
-        <PixelStadium className="h-24 opacity-90 sm:h-28" />
-        <p className="absolute inset-x-0 bottom-3 text-center text-xs text-chalk/80">
-          ── {complete ? "ten pulls done. one footballer. allegedly." : ROUND_LINES[taken]}
-        </p>
+      {toastNode}
+      <div className="relative hidden sm:block">
+        <PixelStadium className="h-20 opacity-90 lg:h-24" />
+        <p className="absolute inset-x-0 bottom-2.5 text-center text-xs text-chalk/80">── {complete ? "ten pulls done. one footballer. allegedly." : ROUND_LINES[taken]}</p>
       </div>
 
-      <div className="mx-auto -mt-1 grid max-w-[1260px] gap-3 px-3 py-3 lg:grid-cols-[280px_minmax(0,1fr)_290px] lg:px-4">
-        <section className="pixel-frame bg-turf">
-          <p className="border-b border-line px-4 py-2 font-pixel text-[11px] tracking-[0.3em] text-haze">YOU ROLLED</p>
-          <div key={rollSpin ? "spin" : `card-${rollCount}`} className={rollSpin ? "" : "animate-card-pop"}>
-            <div className="relative mx-3 mt-3 aspect-[16/9] overflow-hidden lg:aspect-[4/3.3] border border-line bg-[linear-gradient(180deg,#14284a_0%,#0b1424_100%)]">
-              {rollSpin ? (
-                <div className="absolute inset-0 grid place-items-center">
-                  <div className="animate-roll-glow absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(94,230,255,0.32),transparent_60%)]" />
-                  <p className="relative font-pixel text-6xl text-flood">?</p>
-                </div>
-              ) : (
-                <>
-                  <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
-                  <div className="absolute top-2 right-2 border border-line bg-night/85 px-2 py-1 text-center">
-                    <p className="font-pixel text-[9px] tracking-widest text-haze">OVR</p>
-                    <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
-                    <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
+      <div className="mx-auto grid max-w-[1320px] 2xl:max-w-[1560px] gap-3 px-3 py-3 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:px-5 xl:grid-cols-[320px_minmax(0,1fr)_320px] 2xl:grid-cols-[360px_minmax(0,1fr)_360px]">
+        <div className="contents lg:flex lg:flex-col lg:gap-3">
+          <section className="pixel-frame order-1 bg-turf lg:order-none">
+            <p className="hidden border-b border-line px-4 py-2 font-pixel text-[11px] tracking-[0.3em] text-haze lg:block">YOU ROLLED</p>
+            <div key={rollSpin ? "spin" : `card-${rollCount}`} className={`flex gap-3 p-3 lg:block lg:p-0 ${rollSpin ? "" : "animate-card-pop"}`}>
+              <div className="relative size-28 shrink-0 overflow-hidden border border-line bg-[linear-gradient(180deg,#14284a_0%,#0b1424_100%)] sm:size-36 lg:mx-3 lg:mt-3 lg:aspect-[4/3.4] lg:size-auto">
+                {rollSpin ? (
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="animate-roll-glow absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(94,230,255,0.32),transparent_60%)]" />
+                    <p className="relative font-pixel text-4xl text-flood lg:text-6xl">?</p>
                   </div>
-                  <span className={`absolute top-2 left-2 px-1.5 py-0.5 font-pixel text-[9px] tracking-widest ${rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}>
-                    {rolled.role.toUpperCase()}
-                  </span>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
+                    <div className="absolute top-2 right-2 hidden border border-line bg-night/85 px-2 py-1 text-center lg:block">
+                      <p className="font-pixel text-[9px] tracking-widest text-haze">OVR</p>
+                      <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
+                      <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
+                    </div>
+                    <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 font-pixel text-[8px] tracking-widest lg:top-2 lg:left-2 lg:text-[9px] ${rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}>
+                      {rolled.role.toUpperCase()}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 self-center lg:px-4 lg:pt-3 lg:pb-4">
+                <h1 className={`font-digits text-3xl leading-none uppercase sm:text-4xl ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
+                <p className="mt-1.5 truncate font-pixel text-[10px] tracking-[0.2em] text-kit sm:text-[11px]">{(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}</p>
+                {!rollSpin ? (
+                  <>
+                    <p className="mt-2 flex items-baseline gap-2 lg:hidden">
+                      <span className={`font-digits text-3xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</span>
+                      <span className="font-pixel text-[9px] tracking-widest text-haze">OVR · {rolled.eaPosition}</span>
+                    </p>
+                    <p className="mt-2 text-[11px] text-haze lg:mt-3">
+                      {rolled.appearances} apps · {rolled.minutes}&apos; · {rolled.goals}g · {rolled.assists}a
+                    </p>
+                  </>
+                ) : null}
+              </div>
             </div>
-            <div className="px-4 pt-3 pb-4">
-              <h1 className={`font-digits text-4xl leading-none uppercase ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
-              <p className="mt-1.5 font-pixel text-[11px] tracking-[0.2em] text-kit">{(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}</p>
-              {!rollSpin ? (
-                <p className="mt-3 text-[11px] text-haze">
-                  {rolled.appearances} apps · {rolled.minutes}&apos; · {rolled.goals}g · {rolled.assists}a this season
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="pixel-frame bg-turf p-3 sm:p-4">
-          <div className="border border-line bg-night/50 px-4 py-4 text-center">
+          <section className="pixel-frame order-3 bg-turf p-3 lg:order-none">
+            <div className="flex items-baseline justify-between gap-2 px-0.5">
+              <p className="font-pixel text-[11px] tracking-[0.3em] text-gold">QUESTS</p>
+              <p className="text-[10px] text-dim">{quests.done.length} done · rewards are rerolls</p>
+            </div>
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-1">
+              {quests.active.map((active) => {
+                const quest = questById(active.id);
+                const progress = complete ? 0 : questProgress(active, lockedStats, lastRerollAt);
+                return (
+                  <div key={`${active.id}-${active.since}`} className={`border px-2.5 py-2 ${complete ? "border-line/60 opacity-50" : "animate-tile-in border-line bg-stand"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-pixel text-[10px] tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
+                      <RewardChip reward={quest.reward} muted={complete} />
+                    </div>
+                    <p className="mt-0.5 text-[10px] leading-snug text-haze">{quest.detail.toLowerCase()}</p>
+                    <div className="mt-1.5 flex gap-0.5">
+                      {Array.from({ length: quest.target }, (_, index) => (
+                        <span key={index} className={`h-1 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {quests.done.length ? (
+              <ul className="mt-2 space-y-1">
+                {quests.done.map((done) => (
+                  <li key={done.id} className={`flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-dim ${done === latestDone ? "animate-quest-done" : ""}`}>
+                    <span>
+                      <span className="text-grass">✓</span> {questById(done.id).title.toLowerCase()}
+                    </span>
+                    <span className="text-gold/80">{done.banked ? "banked" : rewardText(questById(done.id).reward)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="mt-2 px-0.5 text-[10px] text-dim">
+              {complete ? "build complete. quests closed for this run." : "the streak quest resets whenever you reroll."}
+              {hasBank ? <span className="text-gold/80"> banked for next run: {rewardText(bank)}.</span> : null}
+            </p>
+          </section>
+        </div>
+
+        <section className="pixel-frame order-2 bg-turf p-3 sm:p-4 lg:order-none">
+          <div className="border border-line bg-night/50 px-4 py-3 text-center sm:py-4">
             <p className="font-pixel text-[10px] tracking-[0.35em] text-haze">{complete ? "BUILD COMPLETE" : `PICK ${round} OF 10`}</p>
-            <h2 className="mt-1.5 font-pixel text-xl tracking-[0.12em] text-chalk sm:text-2xl">{complete ? "SIGN FOR A CLUB" : rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}</h2>
+            <h2 className="mt-1.5 font-pixel text-lg tracking-[0.12em] text-chalk sm:text-2xl">{complete ? "SIGN FOR A CLUB" : rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}</h2>
             {!complete ? (
-              <div key={denied} className={`mt-4 flex flex-wrap justify-center gap-2 ${denied ? "animate-shake" : ""}`}>
-                <button
-                  type="button"
-                  onClick={rerollTeam}
-                  disabled={spinning || teamRerolls <= 0}
-                  className="glow-flood flex items-center gap-2 bg-turf px-3 py-2 font-pixel text-[11px] tracking-[0.15em] transition hover:bg-stand disabled:opacity-35"
-                  title="New club and a new player from it"
-                >
-                  REROLL TEAM <span className="font-digits text-lg leading-none text-flood">{teamRerolls}</span> <Key>T</Key>
-                </button>
-                <button
-                  type="button"
-                  onClick={rerollPlayer}
-                  disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
-                  className="glow-kit flex items-center gap-2 bg-turf px-3 py-2 font-pixel text-[11px] tracking-[0.15em] transition hover:bg-stand disabled:opacity-35"
-                  title={`Another ${rolled.teamName} player`}
-                >
-                  REROLL PLAYER <span className="font-digits text-lg leading-none text-kit">{playerRerolls}</span> <Key>Y</Key>
-                </button>
+              <div key={denied} className={`mt-4 hidden flex-wrap justify-center gap-2 lg:flex ${denied ? "animate-shake" : ""}`}>
+                {rerollButtons(false)}
               </div>
             ) : null}
             {lastPick && !complete ? (
-              <p key={`${lastPick.key}-${taken}`} className="animate-tile-in mt-3 text-[11px] text-haze">
+              <p key={`${lastPick.key}-${taken}`} className="animate-tile-in mt-2 text-[11px] text-haze lg:mt-3">
                 last pull: <span className={tier(lastPick.value).text}>{lastPick.value} {lastPick.label.toLowerCase()}</span> from {lastPick.playerName}
               </p>
+            ) : !complete ? (
+              <p className="mt-2 text-[11px] text-haze sm:hidden">── {ROUND_LINES[taken]}</p>
             ) : null}
           </div>
 
           {!complete ? (
             <>
-              <p className="mt-4 font-pixel text-[10px] tracking-[0.25em] text-haze">
+              <p className="mt-3 truncate font-pixel text-[10px] tracking-[0.25em] text-haze sm:mt-4">
                 CHOOSE ONE FROM <span className="text-flood">{rollSpin ? "…" : rolled.name.toUpperCase()}</span>
               </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2">
                 {rolled.stats.map((stat, index) => {
                   const owned = locked[stat.key];
                   const info = tier(stat.value);
@@ -623,39 +886,37 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       disabled={spinning}
                       onClick={() => choose(stat)}
                       style={{ animationDelay: `${index * 30}ms` }}
-                      className={`group relative border px-3 py-2 text-left transition ${spinning ? "" : "animate-tile-in"} ${
-                        owned ? "cursor-not-allowed border-line/60 bg-night/40" : "border-line bg-stand hover:-translate-y-0.5 hover:border-flood hover:bg-[#13223b]"
+                      className={`group relative min-w-0 border px-2.5 py-2 text-left transition sm:px-3 ${spinning ? "" : "animate-tile-in"} ${
+                        owned ? "cursor-not-allowed border-line/60 bg-night/40" : "border-line bg-stand hover:-translate-y-0.5 hover:border-flood hover:bg-[#13223b] active:translate-y-0"
                       }`}
                     >
                       <span className="flex items-start justify-between gap-2">
-                        <span>
-                          <span className={`block font-pixel text-xs tracking-[0.15em] ${owned ? "text-dim" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
-                          <span className="mt-0.5 block text-[10px] text-dim">{owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}</span>
+                        <span className="min-w-0">
+                          <span className={`block truncate font-pixel text-[10px] tracking-[0.12em] sm:text-xs sm:tracking-[0.15em] ${owned ? "text-dim" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
+                          <span className={`mt-0.5 block truncate text-[10px] text-dim ${owned ? "" : "hidden sm:block"}`}>{owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}</span>
                         </span>
-                        <Key>{index === 9 ? 0 : index + 1}</Key>
+                        <Key className="hidden lg:inline-grid">{index === 9 ? 0 : index + 1}</Key>
                       </span>
-                      <span className="mt-1 flex items-end justify-between">
-                        <span className={`font-pixel text-[9px] tracking-widest ${owned || spinning ? "text-transparent" : info.text} opacity-80`}>{info.label.toUpperCase()}</span>
+                      <span className="mt-1 flex items-end justify-between gap-1">
+                        <span className={`truncate font-pixel text-[8px] tracking-widest sm:text-[9px] ${owned || spinning ? "text-transparent" : info.text} opacity-80`}>{info.label.toUpperCase()}</span>
                         {spinning ? (
-                          <span className="animate-roll-glow font-digits text-5xl leading-none text-dim">??</span>
+                          <span className="animate-roll-glow font-digits text-4xl leading-none text-dim sm:text-5xl">??</span>
                         ) : (
-                          <span className={`font-digits text-5xl leading-none ${owned ? "text-dim line-through decoration-1" : info.text}`}>{stat.value}</span>
+                          <span className={`font-digits text-4xl leading-none sm:text-5xl ${owned ? "text-dim line-through decoration-1" : info.text}`}>{stat.value}</span>
                         )}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-3 text-[10px] tracking-wide text-dim">1–0 to pick · T new club · Y same club, new player · M mute</p>
+              <p className="mt-3 hidden text-[10px] tracking-wide text-dim lg:block">1–0 to pick · T new club · Y same club, new player · M mute</p>
             </>
           ) : profile ? (
             <div className="mt-4 border border-line bg-night/50 p-4">
               {!club || spin?.kind === "club" ? (
                 <div className="text-center">
                   <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">THE LAST ROLL</p>
-                  <p className={`mt-3 min-h-12 font-digits text-5xl uppercase ${spin?.kind === "club" ? "animate-ticker text-flood" : "text-dim"}`}>
-                    {spin?.kind === "club" ? spin.title : "which club signs you?"}
-                  </p>
+                  <p className={`mt-3 min-h-12 font-digits text-4xl uppercase sm:text-5xl ${spin?.kind === "club" ? "animate-ticker text-flood" : "text-dim"}`}>{spin?.kind === "club" ? spin.title : "which club signs you?"}</p>
                   <button type="button" onClick={rollClub} disabled={spinning} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand disabled:opacity-40">
                     ▶ ROLL YOUR CLUB ◀
                   </button>
@@ -663,10 +924,12 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
               ) : (
                 <div key={`club-${rollCount}`} className="animate-card-pop text-center">
                   <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">YOU SIGN FOR</p>
-                  <p className="title-split mt-2 font-pixel text-3xl tracking-[0.08em] text-chalk">{club.name.toUpperCase()}</p>
+                  <p className="title-split mt-2 font-pixel text-2xl tracking-[0.08em] text-chalk sm:text-3xl">{club.name.toUpperCase()}</p>
                   <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-haze">
-                    attack {profile.attack.toFixed(1)} · defence {profile.defense.toFixed(1)}.
-                    {replaced ? ` ${replaced.name} (${replaced.overall}) is dropped to make room.` : ""}
+                    attack {profile.attack.toFixed(1)} · defence {profile.defense.toFixed(1)}.{replaced ? ` ${replaced.name} (${replaced.overall}) is dropped to make room.` : ""}
+                  </p>
+                  <p className="mx-auto mt-2 max-w-md text-[11px] text-dim">
+                    season bonus: <span className="text-gold/80">champions +2 team +2 player · top four +1 each · top seven +1 player</span>
                   </p>
                   <button type="button" onClick={playSeason} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand">
                     ▶ PLAY 38 MATCHWEEKS ◀
@@ -677,27 +940,34 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           ) : null}
         </section>
 
-        <section className="pixel-frame bg-turf p-3">
+        <section className="pixel-frame order-4 bg-turf p-3 lg:order-none">
           <div className="flex items-end justify-between border-b border-line px-1 pb-3">
             <div>
               <p className="font-pixel text-[11px] tracking-[0.3em] text-haze">YOUR BUILD</p>
               <p className="mt-1 text-[10px] text-dim">{taken} / 10 attributes</p>
             </div>
             <div className="text-right">
-              <p className={`font-digits text-6xl leading-none ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
+              <p className={`font-digits text-5xl leading-none lg:text-6xl ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
               <p className={`font-pixel text-[9px] tracking-widest ${taken ? tier(rating).text : "text-dim"}`}>{taken ? tier(rating).label.toUpperCase() : "UNBUILT"}</p>
             </div>
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-1.5 lg:grid-cols-1">
+          <div className="mt-2 grid grid-cols-5 gap-1 lg:grid-cols-1 lg:gap-1.5">
             {BUILD_STATS.map((definition) => {
               const slot = locked[definition.key];
               return (
-                <div key={definition.key} className={`flex items-center justify-between gap-2 border px-2.5 py-1.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"}`}>
-                  <div className="min-w-0">
-                    <p className={`font-pixel text-[10px] tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>{definition.label.toUpperCase()}</p>
-                    <p className="truncate text-[10px] text-dim">{slot ? slot.playerName : "open"}</p>
+                <div
+                  key={definition.key}
+                  title={slot ? `${definition.label} ${slot.value} · ${slot.playerName}` : definition.label}
+                  className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"}`}
+                >
+                  <div className="min-w-0 text-center lg:text-left">
+                    <p className={`font-pixel text-[9px] tracking-[0.12em] lg:text-[10px] lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
+                      <span className="lg:hidden">{SHORT_LABEL[definition.key]}</span>
+                      <span className="hidden lg:inline">{definition.label.toUpperCase()}</span>
+                    </p>
+                    <p className="hidden truncate text-[10px] text-dim lg:block">{slot ? slot.playerName : "open"}</p>
                   </div>
-                  <p className={`font-digits text-3xl leading-none ${slot ? tier(slot.value).text : "text-line"}`}>{slot ? slot.value : "--"}</p>
+                  <p className={`font-digits text-2xl leading-none lg:text-3xl ${slot ? tier(slot.value).text : "text-line"}`}>{slot ? slot.value : "--"}</p>
                 </div>
               );
             })}
@@ -712,9 +982,19 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           </div>
         </section>
       </div>
-      <footer className="mx-auto max-w-[1260px] px-4 pb-6 text-[10px] text-dim">
-        ratings: EA SPORTS FC via ea.com · minutes &amp; goals: premierleague.com {data.season} · a fan project, not affiliated with either
-      </footer>
+      <footer className="mx-auto max-w-[1320px] 2xl:max-w-[1560px] px-4 pb-6 text-[10px] text-dim lg:px-5">ratings: EA SPORTS FC via ea.com · minutes &amp; goals: premierleague.com {data.season} · a fan project, not affiliated with either</footer>
+
+      {!complete ? (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-night/95 backdrop-blur lg:hidden">
+          <div key={denied} className={`mx-auto flex max-w-xl items-center gap-2 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] ${denied ? "animate-shake" : ""}`}>
+            <div className="w-14 shrink-0 text-center">
+              <p className={`font-digits text-3xl leading-none ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
+              <p className="font-pixel text-[8px] tracking-widest text-dim">BUILD</p>
+            </div>
+            {rerollButtons(true)}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

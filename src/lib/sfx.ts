@@ -38,6 +38,7 @@ export type SfxEvent =
   | "europe"
   | "relegated"
   | "midtable"
+  | "quest"
   | "deny";
 
 const MUTE_KEY = "frankenballer:muted";
@@ -235,6 +236,12 @@ class Sfx {
         this.whistle(0, 0.6);
         this.tone({ f0: 220, f1: 52, dur: 0.9, peak: 0.24, delay: 0.2 });
         this.noise({ dur: 0.6, lowpass: 400, peak: 0.14, delay: 0.25 });
+        break;
+      case "quest":
+        this.tone({ type: "square", f0: 988, dur: 0.06, peak: 0.05, lowpass: 3600 });
+        this.tone({ type: "square", f0: 1319, dur: 0.22, peak: 0.05, lowpass: 3600, delay: 0.07 });
+        this.arp([1568, 1976, 2637], 0.05, { dur: 0.25, peak: 0.06, delay: 0.16 });
+        this.noise({ dur: 0.4, lowpass: 9000, highpass: 4000, peak: 0.03, delay: 0.16 });
         break;
       case "deny":
         this.tone({ f0: 150, f1: 62, dur: 0.25, peak: 0.16, lowpass: 700 });
