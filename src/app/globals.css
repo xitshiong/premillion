@@ -131,6 +131,51 @@
   animation: none;
 }
 
+@keyframes pitch-run {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(2px, -1px); }
+  50% { transform: translate(4px, 0); }
+  75% { transform: translate(2px, -1px); }
+}
+@keyframes pitch-run-rev {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-2px, -1px); }
+  50% { transform: translate(-4px, 0); }
+  75% { transform: translate(-2px, -1px); }
+}
+@keyframes pitch-kick {
+  0%, 62%, 100% { transform: rotate(0deg); }
+  70% { transform: rotate(28deg); }
+  78% { transform: rotate(-8deg); }
+}
+@keyframes pitch-ball {
+  0% { transform: translate(118px, 78px); }
+  12% { transform: translate(148px, 72px); }
+  24% { transform: translate(188px, 80px); }
+  36% { transform: translate(210px, 88px); }
+  48% { transform: translate(176px, 94px); }
+  60% { transform: translate(142px, 86px); }
+  72% { transform: translate(108px, 92px); }
+  84% { transform: translate(96px, 82px); }
+  100% { transform: translate(118px, 78px); }
+}
+@keyframes pitch-ball-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes pitch-keeper {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.pitch-run { animation: pitch-run 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+.pitch-run-rev { animation: pitch-run-rev 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+.pitch-run-slow { animation: pitch-run 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+.pitch-kick { animation: pitch-kick 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: top left; }
+.pitch-ball { animation: pitch-ball 8s linear infinite; }
+.pitch-ball-spin { animation: pitch-ball-spin 0.7s linear infinite; transform-box: fill-box; transform-origin: center; }
+.pitch-keeper { animation: pitch-keeper 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center bottom; }
+
 /* Soft turf grain instead of CRT scanlines. */
 .crt {
   background-image:
@@ -171,7 +216,8 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-card-pop, .animate-tile-in, .animate-slot-fill, .animate-ticker, .animate-roll-glow,
   .animate-flicker, .animate-bob, .animate-blink, .animate-shake, .animate-quest-done,
-  .btn-pulse {
+  .btn-pulse,
+  .pitch-run, .pitch-run-rev, .pitch-run-slow, .pitch-kick, .pitch-ball, .pitch-ball-spin, .pitch-keeper {
     animation: none;
   }
   .btn-game:hover:not(:disabled),
