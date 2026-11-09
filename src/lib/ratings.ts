@@ -17,6 +17,32 @@ export const BUILD_STATS = [
 
 export type BuildStatKey = (typeof BUILD_STATS)[number]["key"];
 
+/**
+ * EA stores GK face stats in the same pac/sho/pas/dri/def/phy fields as outfielders:
+ * Diving, Handling, Kicking, Reflexes, Speed, Positioning — not pace/dribbling.
+ */
+export const GK_FACE_STATS: Partial<Record<BuildStatKey, { label: string; detail: string }>> = {
+  pac: { label: "Diving", detail: "EA GK diving (stored in the pace slot)" },
+  sho: { label: "Handling", detail: "EA GK handling (stored in the shooting slot)" },
+  pas: { label: "Kicking", detail: "EA GK kicking (stored in the passing slot)" },
+  dri: { label: "Reflexes", detail: "EA GK reflexes (stored in the dribbling slot)" },
+  def: { label: "Speed", detail: "EA GK speed (stored in the defending slot)" },
+  phy: { label: "Positioning", detail: "EA GK positioning (stored in the physical slot)" },
+  reactions: { label: "Reactions", detail: "Shot reactions and alertness" },
+  vision: { label: "Vision", detail: "Distribution awareness" },
+  finishing: { label: "Finishing", detail: "Not a keeper primary — usually very low" },
+  headingAccuracy: { label: "Heading", detail: "Not a keeper primary — usually very low" },
+};
+
+export function labelsForPlayer(position: string, key: BuildStatKey) {
+  const base = BUILD_STATS.find((stat) => stat.key === key)!;
+  if (position === "G") {
+    const gk = GK_FACE_STATS[key];
+    if (gk) return gk;
+  }
+  return { label: base.label, detail: base.detail };
+}
+
 /** Form is a light nudge. At full minutes it is 28% of the rating; it cannot drag EA more than MAX_FORM_DRAG. */
 export const FORM_WEIGHT = 0.28;
 export const FULL_FORM_MINUTES = 900;
@@ -30,7 +56,8 @@ export const POSITION_KEYS: Record<string, BuildStatKey[]> = {
   D: ["def", "phy", "reactions", "headingAccuracy"],
   M: ["pas", "dri", "vision", "pac"],
   F: ["sho", "finishing", "pac", "dri"],
-  G: ["reactions", "pas", "def", "phy"],
+  // GK face slots: diving / reflexes / positioning / kicking (EA pac/dri/phy/pas).
+  G: ["pac", "dri", "phy", "pas"],
 };
 
 export type RollStat = {

@@ -11,6 +11,7 @@ import {
   POSITION_KEYS,
   PRIME_CHANCE,
   buildPrimeVariant,
+  labelsForPlayer,
   strengthFrom,
   type BuildStatKey,
   type ClubRating,
@@ -133,7 +134,8 @@ export function getGameData(): GameData {
       const rank = percentile[definition.key];
       const form = rank === undefined ? null : quantile(eaSorted.get(definition.key)!, rank);
       const value = blendValue(eaValue, form, weight, primaries.has(definition.key));
-      return { key: definition.key, label: definition.label, detail: definition.detail, value, ea: eaValue, form };
+      const copy = labelsForPlayer(player.position ?? "", definition.key);
+      return { key: definition.key, label: copy.label, detail: copy.detail, value, ea: eaValue, form };
     });
     const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
     const base = {
