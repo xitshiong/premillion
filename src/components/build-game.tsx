@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import Image from "next/image";
 import Link from "next/link";
 import { BookOpen, RotateCcw, Volume2, VolumeX } from "lucide-react";
-import { PixelStadium } from "@/components/pixel-stadium";
 import {
   ACTIVE_QUESTS,
   questById,
@@ -100,14 +99,14 @@ function ordinal(place: number) {
 }
 
 function verdict(place: number) {
-  if (place === 1) return { title: "Champions", line: "stitched together from ten blokes and it won the league.", sound: "champion" as const, color: "text-gold" };
-  if (place <= 4) return { title: "Champions League", line: "not bad for a lad made of spare parts.", sound: "europe" as const, color: "text-flood" };
-  if (place <= 7) return { title: "Europe", line: "thursday nights it is.", sound: "europe" as const, color: "text-flood" };
-  if (place <= 17) return { title: "Mid-table", line: "nobody is writing songs about this one.", sound: "midtable" as const, color: "text-chalk" };
-  return { title: "Relegated", line: "the stitches didn't hold.", sound: "relegated" as const, color: "text-kit" };
+  if (place === 1) return { title: "Champions!", line: "stitched together from ten blokes, and it won the league.", sound: "champion" as const, color: "text-red" };
+  if (place <= 4) return { title: "Champions League", line: "not bad for a lad made of spare parts.", sound: "europe" as const, color: "text-sky" };
+  if (place <= 7) return { title: "Into Europe", line: "thursday nights it is. pack a coat.", sound: "europe" as const, color: "text-pitch" };
+  if (place <= 17) return { title: "Mid-table", line: "nobody is writing songs about this one.", sound: "midtable" as const, color: "text-ink" };
+  return { title: "Relegated", line: "the stitches didn't hold.", sound: "relegated" as const, color: "text-red" };
 }
 
-function Portrait({ url, name }: { url: string | null; name: string }) {
+function Portrait({ url, name, sizes = "280px" }: { url: string | null; name: string; sizes?: string }) {
   const [failed, setFailed] = useState(false);
   if (!url || failed) {
     const initials = name
@@ -115,17 +114,17 @@ function Portrait({ url, name }: { url: string | null; name: string }) {
       .map((part) => part[0])
       .slice(0, 2)
       .join("");
-    return <p className="absolute inset-0 grid place-items-center font-pixel text-4xl text-line lg:text-6xl">{initials}</p>;
+    return <p className="absolute inset-0 grid place-items-center font-display text-5xl text-sheet/70 lg:text-7xl">{initials}</p>;
   }
-  return <Image src={url} alt={name} fill unoptimized loading="eager" sizes="280px" className="object-contain object-bottom" onError={() => setFailed(true)} />;
+  return <Image src={url} alt={name} fill unoptimized loading="eager" sizes={sizes} className="object-contain object-bottom" onError={() => setFailed(true)} />;
 }
 
 function Key({ children, className = "inline-grid" }: { children: React.ReactNode; className?: string }) {
-  return <span className={`h-5 min-w-5 place-items-center border border-line bg-night px-1 font-ui text-[10px] text-haze ${className}`}>{children}</span>;
+  return <span className={`h-5 min-w-5 place-items-center border border-ink/40 bg-sheet px-1 font-type text-[11px] leading-none text-ink-soft ${className}`}>{children}</span>;
 }
 
 function IconButton({ label, onClick, href, children }: { label: string; onClick?: () => void; href?: string; children: React.ReactNode }) {
-  const className = "grid size-8 shrink-0 place-items-center sm:size-9 border border-line bg-stand text-haze transition hover:border-flood hover:text-flood";
+  const className = "sticker-sm press grid size-8 shrink-0 place-items-center text-ink sm:size-9";
   if (href) {
     return (
       <Link href={href} aria-label={label} title={label} className={className}>
@@ -141,7 +140,55 @@ function IconButton({ label, onClick, href, children }: { label: string; onClick
 }
 
 function RewardChip({ reward, muted = false }: { reward: Reward; muted?: boolean }) {
-  return <span className={`shrink-0 font-pixel text-[9px] tracking-[0.12em] ${muted ? "text-dim" : "text-gold"}`}>{rewardText(reward).toUpperCase()}</span>;
+  return <span className={`shrink-0 px-1 font-type text-[11px] font-bold ${muted ? "text-ink-faint" : "marker text-ink"}`}>{rewardText(reward)}</span>;
+}
+
+const BANDS = [
+  { clip: "inset(0 0 56% 0)", shift: "translateX(-4%) rotate(-1.5deg)", label: "the eyes of" },
+  { clip: "inset(44% 0 33% 0)", shift: "translateX(3.5%) rotate(1deg)", label: "the smile of" },
+  { clip: "inset(67% 0 0 0)", shift: "translateX(-2%)", label: "the shoulders of" },
+];
+
+/** Three real portraits cut into bands and sewn back together: the game's whole premise in one picture. */
+function StitchedHero({ parts }: { parts: RollPlayer[] }) {
+  return (
+    <div className="relative mx-auto w-full max-w-[380px]">
+      <div className="sticker tape animate-wobble relative aspect-[4/4.6] overflow-hidden">
+        <div className="halftone absolute inset-0" />
+        {parts.map((player, index) => (
+          <div key={player.id} className="absolute inset-0" style={{ clipPath: BANDS[index].clip, transform: BANDS[index].shift }}>
+            <Portrait url={player.avatarUrl} name={player.name} sizes="380px" />
+          </div>
+        ))}
+        <div className="seam absolute inset-x-0 top-[44%] -translate-y-1/2" />
+        <div className="seam absolute inset-x-0 top-[67%] -translate-y-1/2" />
+        <p className="absolute bottom-2 left-2 bg-ink px-2 py-0.5 font-type text-[11px] text-sheet">specimen no. 27</p>
+      </div>
+      <ul className="mt-4 grid grid-cols-3 gap-2 font-type text-[11px] leading-tight text-ink-soft">
+        {parts.map((player, index) => (
+          <li key={player.id} className="border-t-2 border-dashed border-red pt-1.5">
+            {BANDS[index].label}
+            <span className="block font-body text-xs font-bold text-ink">{player.name}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function StatSource({ stat }: { stat: RollStat }) {
+  if (stat.form === null) return <>EA {stat.ea} · no season data</>;
+  return (
+    <>
+      EA {stat.ea} · form {stat.form}
+    </>
+  );
+}
+
+function FormChip({ delta }: { delta: number }) {
+  if (delta > 0) return <span className="bg-pitch px-1.5 py-0.5 font-type text-[11px] font-bold text-sheet">IN FORM +{delta}</span>;
+  if (delta < 0) return <span className="bg-red px-1.5 py-0.5 font-type text-[11px] font-bold text-sheet">OFF FORM −{Math.abs(delta)}</span>;
+  return <span className="bg-ink px-1.5 py-0.5 font-type text-[11px] font-bold text-sheet">AS RATED</span>;
 }
 
 export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
@@ -458,25 +505,36 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   const bestRun = runs.reduce<RunRecord | null>((best, run) => (!best || run.place < best.place ? run : best), null);
   const hasBank = bank.team > 0 || bank.player > 0;
 
+  const heroParts = useMemo(() => {
+    const random = mulberry32(seed ^ 0xface);
+    const stars = data.players.filter((player) => player.avatarUrl && player.eaOverall >= 83);
+    const chosen: RollPlayer[] = [];
+    while (chosen.length < 3 && stars.length > chosen.length) {
+      const next = pick(stars, random);
+      if (!chosen.includes(next)) chosen.push(next);
+    }
+    return chosen;
+  }, [data.players, seed]);
+
   const header = (
-    <header className="sticky top-0 z-30 border-b border-line bg-night/90 backdrop-blur">
-      <div className="mx-auto flex max-w-[1320px] 2xl:max-w-[1560px] items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-5">
-        <button type="button" onClick={() => setPhase("intro")} className="title-split shrink-0 font-pixel text-sm tracking-[0.04em] text-chalk sm:text-xl sm:tracking-[0.12em]">
-          FRANKENBALLER
+    <header className="sticky top-0 z-30 border-b-2 border-ink bg-sheet">
+      <div className="mx-auto flex max-w-[1320px] items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-5 2xl:max-w-[1560px]">
+        <button type="button" onClick={() => setPhase("intro")} className="shrink-0 font-display text-xl leading-none tracking-wide text-ink uppercase sm:text-2xl" aria-label="Frankenballer, back to the cover">
+          Franken<span className="text-red">baller</span>
         </button>
         {phase === "build" ? (
           <div className="min-w-0 text-center">
-            <p className="font-pixel text-[9px] tracking-[0.12em] whitespace-nowrap text-chalk sm:text-sm sm:tracking-[0.3em]">
-              {complete ? "BUILT" : `ROUND ${round}/10`}
-            </p>
-            <div className="mt-1 flex justify-center gap-0.5 sm:gap-1">
+            <p className="font-type text-[11px] font-bold whitespace-nowrap text-ink sm:text-xs">{complete ? "all ten stitched" : `pick ${round} of 10`}</p>
+            <div className="mt-1 flex justify-center gap-[3px]">
               {Array.from({ length: 10 }, (_, index) => (
-                <span key={index} className={`h-1.5 w-1.5 sm:w-4 ${index < taken ? "bg-flood" : index === taken && !complete ? "animate-blink bg-flood/50" : "bg-line"}`} />
+                <span key={index} className={`h-1 w-2 sm:w-3.5 ${index < taken ? "bg-red" : index === taken && !complete ? "animate-blink bg-ink" : "bg-rule"}`} />
               ))}
             </div>
           </div>
-        ) : null}
-        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+        ) : (
+          <p className="hidden font-type text-xs text-ink-soft md:block">a premier league build game · {data.season}</p>
+        )}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <IconButton label={muted ? "Sound off (M)" : "Sound on (M)"} onClick={() => muteStore.toggle()}>
             {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
           </IconButton>
@@ -494,49 +552,62 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   );
 
   const toastNode = toast ? (
-    <div key={toast.id} className="animate-toast pointer-events-none fixed top-16 left-1/2 z-40 w-[min(92vw,420px)] border border-gold bg-night/95 px-4 py-3 text-center shadow-[0_0_24px_rgba(255,209,102,0.35)]">
-      <p className="font-pixel text-[10px] tracking-[0.3em] text-gold">QUEST COMPLETE</p>
-      <p className="mt-1 font-pixel text-sm tracking-[0.12em] text-chalk">{toast.title.toUpperCase()}</p>
-      <p className="mt-1 text-[11px] text-haze">
+    <div key={toast.id} className="animate-stamp pointer-events-none fixed top-16 left-1/2 z-40 w-[min(88vw,360px)] border-4 border-red bg-sheet/95 px-4 py-2.5 text-center text-red shadow-[4px_4px_0_rgba(27,24,19,0.25)]">
+      <p className="font-display text-2xl leading-none tracking-wide uppercase">Quest done</p>
+      <p className="mt-1 font-type text-sm font-bold">{toast.title.toLowerCase()}</p>
+      <p className="font-type text-xs text-ink">
         {rerollText(toast.reward)}
-        {toast.banked ? " · banked for your next run" : ""}
+        {toast.banked ? ", banked for next run" : ""}
       </p>
     </div>
   ) : null;
 
   if (phase === "intro") {
     return (
-      <div className="crt relative flex min-h-screen flex-col overflow-hidden bg-night font-ui text-chalk">
+      <div className="newsprint flex min-h-screen flex-col font-body text-ink">
         {header}
-        <div className="relative flex flex-1 flex-col">
-          <div className="relative">
-            <PixelStadium className="h-[38vh] min-h-[220px] sm:h-[46vh] sm:min-h-[260px]" />
-            <div className="absolute inset-x-0 top-[8%] px-4 text-center">
-              <h1 className="title-split animate-flicker font-pixel text-[12vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">FRANKENBALLER</h1>
-              <p className="mt-4 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-[10px] tracking-[0.4em] text-flood sm:text-sm sm:tracking-[0.5em]">THE {data.season} BUILD</p>
-            </div>
-          </div>
-          <div className="relative mx-auto w-full max-w-xl flex-1 px-4 pt-7 pb-10 text-center">
-            <p className="text-sm text-haze">
-              ten real premier league players · one attribute from each · <span className="text-chalk">38 matchweeks to prove it</span>
+        <main className="mx-auto grid w-full max-w-[1180px] flex-1 items-center gap-10 px-5 py-8 sm:py-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-16">
+          <div>
+            <p className="font-type text-sm text-ink-soft">
+              issue {data.season} · <span className="marker px-0.5 text-ink">one player, ten donors</span>
             </p>
-            <button type="button" onClick={kickOff} className="glow-flood mt-6 w-full bg-turf py-4 font-pixel text-lg tracking-[0.3em] text-chalk transition hover:bg-stand">
-              ▶ {taken > 0 || season ? "RESUME" : "KICK OFF"} ◀
-            </button>
-            <div className="mt-6 space-y-2 text-left text-xs leading-relaxed text-haze">
-              <p>── each round draws a club, then one of its players. take one of his ten EA FC ratings. pace from one, finishing from another.</p>
-              <p>── reroll team for a new club. reroll player to stay at the same club.</p>
-              <p>
-                ── <span className="text-gold">quests</span> pay out extra rerolls. finish in the top seven and you bank more for the next run.
-              </p>
-              <p>── only lads who actually play: at least 270 league minutes this season. {data.firstTeam} first-teamers, {data.bench} off the bench.</p>
-              <p>── then you sign for a random club and we play the whole season.</p>
+            <h1 className="mt-3 font-display text-[22vw] leading-[0.84] tracking-tight uppercase sm:text-[9rem] lg:text-[10.5rem]">
+              Franken
+              <br />
+              <span className="text-red">baller</span>
+            </h1>
+            <div className="seam mt-5 max-w-md" />
+            <p className="mt-5 max-w-lg text-lg leading-snug text-ink-soft">
+              Roll a real Premier League player. Steal <strong className="text-ink">one</strong> of his attributes. Do it ten times, sew the bits together, and see if the monster can win the league.
+            </p>
+            <div className="mt-7 lg:hidden">
+              <StitchedHero parts={heroParts} />
             </div>
-            <p className="mt-8 hidden text-[10px] tracking-[0.2em] text-dim uppercase sm:block">enter to start · m to mute · sound recommended</p>
+            <button type="button" onClick={kickOff} className="sticker press mt-8 flex w-full max-w-md items-center justify-between bg-red px-6 py-4 text-left text-sheet">
+              <span className="font-display text-3xl tracking-wide uppercase">{taken > 0 || season ? "Back to it" : "Kick off"}</span>
+              <span className="font-type text-sm">press enter ↵</span>
+            </button>
+            <ol className="mt-8 max-w-lg space-y-2.5 font-type text-[13px] leading-snug text-ink-soft">
+              <li>
+                <span className="font-bold text-red">01</span> each round draws a club, then one of its players. take one of his ten stats.
+              </li>
+              <li>
+                <span className="font-bold text-red">02</span> stats are his EA SPORTS FC rating blended with how he is <em>actually</em> playing this season. bad form drags him down.
+              </li>
+              <li>
+                <span className="font-bold text-red">03</span> reroll the team for a new club, or the player to stay at the same one. quests pay out extra rerolls.
+              </li>
+              <li>
+                <span className="font-bold text-red">04</span> then a random club signs you, and we play all 38 matchweeks.
+              </li>
+            </ol>
           </div>
-        </div>
-        <footer className="border-t border-line px-4 py-3 text-center text-[10px] tracking-wide text-dim">
-          ratings: EA SPORTS FC via ea.com · minutes &amp; goals: premierleague.com · a fan project, not affiliated with either
+          <div className="hidden lg:block">
+            <StitchedHero parts={heroParts} />
+          </div>
+        </main>
+        <footer className="border-t-2 border-ink bg-sheet px-4 py-3 text-center font-type text-[11px] text-ink-soft">
+          ratings: EA SPORTS FC via ea.com · form: premierleague.com and fantasy premier league · {data.firstTeam} first-teamers and {data.bench} squad players with 270+ minutes · a fan project, not affiliated with any of them
         </footer>
       </div>
     );
@@ -559,50 +630,50 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       { w: 0, d: 0, l: 0 },
     );
     const options = [
-      { key: "N", title: "NEW RUN", detail: `fresh build · ${TEAM_REROLLS + bank.team} team / ${PLAYER_REROLLS + bank.player} player rerolls`, glow: "glow-kit" },
-      { key: "R", title: "RUN IT BACK", detail: "same build, same club, new season", glow: "glow-flood" },
-      { key: "C", title: "NEW CLUB", detail: "same build, roll another club", glow: "glow-flood" },
+      { key: "N", title: "New run", detail: `fresh monster · ${TEAM_REROLLS + bank.team} team / ${PLAYER_REROLLS + bank.player} player rerolls`, tone: "bg-red text-sheet" },
+      { key: "R", title: "Run it back", detail: "same player, same club, new season", tone: "bg-sheet text-ink" },
+      { key: "C", title: "New club", detail: "same player, roll another club", tone: "bg-sheet text-ink" },
     ];
     return (
-      <div className="crt min-h-screen bg-night font-ui text-chalk">
+      <div className="newsprint min-h-screen font-body text-ink">
         {header}
-        <div className="mx-auto grid max-w-[1320px] 2xl:max-w-[1560px] gap-3 px-3 py-3 sm:py-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:px-5">
-          <div className="flex min-w-0 flex-col gap-3">
-            <section className="pixel-frame bg-turf p-4 sm:p-6">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="font-pixel text-xs tracking-[0.3em] text-flood">{club.name.toUpperCase()}</p>
-                <p className="text-[11px] text-dim">
-                  build <span className={tier(rating).text}>{rating}</span> · attack {profile?.attack.toFixed(1)} · defence {profile?.defense.toFixed(1)}
-                </p>
+        <div className="mx-auto grid max-w-[1320px] gap-5 px-3 py-4 sm:px-5 sm:py-6 lg:grid-cols-[minmax(0,1fr)_400px] 2xl:max-w-[1560px]">
+          <div className="flex min-w-0 flex-col gap-5">
+            <section className="sticker p-4 sm:p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-ink pb-2 font-type text-xs">
+                <span className="font-bold uppercase">the frankenballer gazette · {club.name}</span>
+                <span className="text-ink-soft">
+                  build {rating} · attack {profile?.attack.toFixed(1)} · defence {profile?.defense.toFixed(1)}
+                </span>
               </div>
-              <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+              <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs text-haze uppercase">{done ? "full time" : `matchweek ${week} / 38`}</p>
-                  <p className={`font-digits text-7xl leading-none sm:text-8xl ${done ? end.color : "text-chalk"}`}>{place ? ordinal(place) : "—"}</p>
-                  <p className="mt-1 font-digits text-xl text-haze">
-                    <span className="text-grass">{record.w}W</span> <span className="text-gold">{record.d}D</span> <span className="text-kit">{record.l}L</span> · {table[place - 1]?.points ?? 0} pts
+                  <p className="font-type text-sm text-ink-soft">{done ? "full time. final position:" : `matchweek ${week} of 38`}</p>
+                  <p className={`font-display text-8xl leading-[0.9] uppercase sm:text-9xl ${done ? end.color : "text-ink"}`}>{place ? ordinal(place) : "—"}</p>
+                  <p className="mt-1 font-type text-sm font-bold">
+                    <span className="text-pitch">{record.w}W</span> · <span className="text-ink-soft">{record.d}D</span> · <span className="text-red">{record.l}L</span> · {table[place - 1]?.points ?? 0} pts
                   </p>
                 </div>
                 {!done ? (
                   <div className="flex flex-col items-end gap-2">
                     {latest ? (
-                      <p key={latest.week} className="animate-tile-in font-digits text-3xl text-haze">
+                      <p key={latest.week} className="animate-tile-in font-display text-4xl uppercase">
                         {shortName.get(latest.home)} {latest.homeGoals}–{latest.awayGoals} {shortName.get(latest.away)}
                       </p>
                     ) : null}
-                    <button type="button" onClick={() => finishSeason(season.matches, club)} className="border border-line px-3 py-1.5 font-pixel text-xs tracking-[0.2em] text-haze hover:border-flood hover:text-flood">
-                      SKIP ▶▶
+                    <button type="button" onClick={() => finishSeason(season.matches, club)} className="sticker-sm press px-3 py-1.5 font-type text-sm font-bold">
+                      skip to full time ▸▸
                     </button>
                   </div>
                 ) : null}
               </div>
               {done ? (
                 <div className="animate-card-pop mt-4">
-                  <p className={`title-split font-pixel text-2xl tracking-[0.12em] sm:text-4xl ${end.color}`}>{end.title.toUpperCase()}</p>
-                  <p className="mt-1 text-sm text-haze">── {end.line}</p>
+                  <p className={`font-display text-5xl leading-none uppercase sm:text-6xl ${end.color}`}>{end.title}</p>
+                  <p className="mt-2 font-type text-base text-ink-soft">“{end.line}”</p>
                 </div>
               ) : null}
-              <div className="mt-5 grid grid-cols-[repeat(19,minmax(0,1fr))] gap-1 sm:flex sm:flex-wrap" aria-label="Form">
+              <div className="mt-5 grid grid-cols-[repeat(19,minmax(0,1fr))] gap-[3px]" aria-label="Form">
                 {mine.map((match) => {
                   const home = match.home === club.id;
                   const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
@@ -610,38 +681,40 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   return (
                     <span
                       key={match.week}
-                      title={`W${match.week} ${home ? "vs" : "at"} ${shortName.get(home ? match.away : match.home)} ${match.homeGoals}–${match.awayGoals}`}
-                      className={`aspect-square sm:size-3.5 ${!played ? "bg-line/60" : diff > 0 ? "bg-grass" : diff < 0 ? "bg-kit" : "bg-gold"}`}
-                    />
+                      title={`MW${match.week} ${home ? "vs" : "at"} ${shortName.get(home ? match.away : match.home)} ${match.homeGoals}–${match.awayGoals}`}
+                      className={`grid aspect-square place-items-center border border-ink/70 font-type text-[9px] font-bold sm:text-[10px] ${!played ? "border-dashed border-rule bg-transparent text-transparent" : diff > 0 ? "bg-pitch text-sheet" : diff < 0 ? "bg-red text-sheet" : "bg-marker text-ink"}`}
+                    >
+                      {played ? (diff > 0 ? "W" : diff < 0 ? "L" : "D") : ""}
+                    </span>
                   );
                 })}
               </div>
             </section>
 
             {done ? (
-              <section className="animate-card-pop pixel-frame border-gold/40 bg-turf p-4 sm:p-5">
+              <section className="animate-card-pop sticker relative p-4 sm:p-5">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="font-pixel text-sm tracking-[0.3em] text-chalk">WHAT NOW?</p>
-                  <p className="text-[11px] text-dim">
-                    season {runs.length} this session{bestRun ? ` · best ${ordinal(bestRun.place)} with ${bestRun.clubName}` : ""}
+                  <p className="font-display text-3xl tracking-wide uppercase">What now?</p>
+                  <p className="font-type text-xs text-ink-soft">
+                    season {runs.length} this session{bestRun ? ` · best: ${ordinal(bestRun.place)} with ${bestRun.clubName}` : ""}
                   </p>
                 </div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
                   {options.map((option) => (
-                    <button key={option.key} type="button" onClick={() => afterSeason(option.key)} className={`${option.glow} group flex items-center justify-between gap-3 bg-stand px-4 py-3 text-left transition hover:-translate-y-0.5 hover:bg-[#13223b] sm:flex-col sm:items-start`}>
+                    <button key={option.key} type="button" onClick={() => afterSeason(option.key)} className={`sticker press flex items-center justify-between gap-3 px-4 py-3 text-left sm:flex-col sm:items-start ${option.tone}`}>
                       <span>
-                        <span className="block font-pixel text-sm tracking-[0.2em] text-chalk">{option.title}</span>
-                        <span className="mt-1 block text-[11px] text-haze">{option.detail}</span>
+                        <span className="block font-display text-2xl leading-none tracking-wide uppercase">{option.title}</span>
+                        <span className="mt-1.5 block font-type text-xs opacity-80">{option.detail}</span>
                       </span>
                       <Key className="hidden sm:inline-grid">{option.key}</Key>
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-[11px] text-haze">
+                <p className="mt-4 font-type text-xs text-ink-soft">
                   {seasonNote?.fresh ? (
                     seasonNote.reward.team + seasonNote.reward.player > 0 ? (
                       <>
-                        season bonus banked for your next run: <span className="text-gold">{rerollText(seasonNote.reward)}</span>.
+                        season bonus banked for your next run: <span className="marker px-0.5 font-bold text-ink">{rerollText(seasonNote.reward)}</span>.
                       </>
                     ) : (
                       "no season bonus this time. finish top seven to bank extra rerolls."
@@ -649,80 +722,70 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   ) : (
                     "this build already paid its season bonus. a new run can earn another."
                   )}
-                  {hasBank ? <span className="text-dim"> total banked: {rewardText(bank)}.</span> : null}
+                  {hasBank ? <span> total banked: {rewardText(bank)}.</span> : null}
                 </p>
               </section>
             ) : null}
 
-            <section className="pixel-frame bg-turf p-3 sm:p-4">
-              <p className="mb-2 font-pixel text-[10px] tracking-[0.3em] text-haze">RESULTS</p>
-              <div className="grid max-h-64 gap-1 overflow-y-auto pr-1 sm:grid-cols-2 lg:max-h-[19rem]">
+            <section className="sticker p-4 sm:p-5">
+              <p className="font-display text-xl tracking-wide uppercase">Results</p>
+              <div className="mt-2 grid max-h-64 gap-x-6 overflow-y-auto pr-1 font-type text-sm sm:grid-cols-2 lg:max-h-[19rem]">
                 {[...shown].reverse().map((match) => {
                   const home = match.home === club.id;
                   const diff = (home ? match.homeGoals : match.awayGoals) - (home ? match.awayGoals : match.homeGoals);
                   return (
-                    <p key={match.week} className="flex items-center justify-between border border-line bg-night/60 px-3 py-1 text-xs">
-                      <span className="w-10 text-dim">MW{match.week}</span>
-                      <span className="flex-1 text-center">
+                    <p key={match.week} className="flex items-center justify-between border-b border-dashed border-rule py-1">
+                      <span className="w-12 text-ink-faint">mw{match.week}</span>
+                      <span className="flex-1">
                         {home ? "vs" : "at"} {shortName.get(home ? match.away : match.home)}
                       </span>
-                      <span className={`font-digits text-lg ${diff > 0 ? "text-grass" : diff < 0 ? "text-kit" : "text-gold"}`}>
+                      <span className={`font-bold ${diff > 0 ? "text-pitch" : diff < 0 ? "text-red" : "text-ink-soft"}`}>
                         {match.homeGoals}–{match.awayGoals}
                       </span>
                     </p>
                   );
                 })}
-                {!shown.length ? <p className="text-xs text-dim">kick-off…</p> : null}
+                {!shown.length ? <p className="text-ink-faint">kick-off…</p> : null}
               </div>
-              <p className="mt-4 max-w-2xl text-[11px] leading-relaxed text-dim">
-                how it works: each club is rated from the EA ratings of its {data.coreSize} most-used outfielders, and you replace the weakest of {club.name}&apos;s. attack is pace, shooting, passing, dribbling, finishing and vision. defence is defending, physical, reactions and heading. a match turns those into expected goals around {data.goalsPerTeamGame.toFixed(2)} a side (this season&apos;s real scoring rate), home sides get a 10% bump, and the score is drawn at random. a simulation, not a prediction.
+              <p className="mt-4 max-w-2xl font-type text-[11px] leading-relaxed text-ink-faint">
+                how it works: each club is rated from the blended ratings of its {data.coreSize} most-used outfielders, and you replace the weakest of {club.name}&apos;s. attack is pace, shooting, passing, dribbling, finishing and vision. defence is defending, physical, reactions and heading. a match turns those into expected goals around {data.goalsPerTeamGame.toFixed(2)} a side (this season&apos;s real scoring rate), home sides get a 10% bump, and the score is drawn at random. a simulation, not a prediction.
               </p>
             </section>
           </div>
 
-          <section className="pixel-frame self-start bg-turf p-3 lg:sticky lg:top-16">
-            <p className="mb-1 px-1.5 font-pixel text-[10px] tracking-[0.3em] text-haze">TABLE</p>
-            <table className="w-full table-fixed text-xs">
-              <thead className="text-dim">
+          <section className="sticker self-start p-3 sm:p-4 lg:sticky lg:top-20">
+            <p className="border-b-2 border-ink pb-1.5 font-display text-xl tracking-wide uppercase">The table</p>
+            <table className="mt-1 w-full table-fixed font-type text-[13px]">
+              <thead className="text-ink-faint">
                 <tr>
-                  <th className="w-7 px-1.5 py-1 text-left font-normal" />
-                  <th className="px-1.5 py-1 text-left font-normal uppercase">club</th>
-                  <th className="w-8 px-1.5 py-1 text-right font-normal uppercase">p</th>
-                  <th className="w-10 px-1.5 py-1 text-right font-normal uppercase">gd</th>
-                  <th className="w-10 px-1.5 py-1 text-right font-normal uppercase">pts</th>
+                  <th className="w-7 py-1 text-left font-normal" />
+                  <th className="py-1 text-left font-normal">club</th>
+                  <th className="w-8 py-1 text-right font-normal">p</th>
+                  <th className="w-11 py-1 text-right font-normal">gd</th>
+                  <th className="w-11 py-1 text-right font-normal">pts</th>
                 </tr>
               </thead>
               <tbody>
                 {table.map((row, index) => {
                   const yours = row.id === club.id;
                   const diff = row.goalsFor - row.goalsAgainst;
-                  const zone = index === 0 ? "border-l-gold" : index < 4 ? "border-l-flood" : index >= 17 ? "border-l-kit" : "border-l-transparent";
+                  const zone = index === 3 ? "border-b-2 border-b-ink" : index === 16 ? "border-b-2 border-b-red" : "border-b border-b-rule/70";
                   return (
-                    <tr key={row.id} className={`border-l-2 ${zone} ${yours ? "bg-flood/15 text-flood" : "text-chalk/85"}`}>
-                      <td className="px-1.5 py-1 font-digits text-base text-dim">{index + 1}</td>
-                      <td className="truncate px-1.5 py-1">
+                    <tr key={row.id} className={`${zone} ${yours ? "marker font-bold text-ink" : "text-ink-soft"}`}>
+                      <td className="py-1 font-display text-base text-ink">{index + 1}</td>
+                      <td className="truncate py-1">
                         <span className="sm:hidden">{row.abbr || row.name}</span>
                         <span className="hidden sm:inline">{row.name}</span>
                       </td>
-                      <td className="px-1.5 py-1 text-right tabular-nums">{row.played}</td>
-                      <td className="px-1.5 py-1 text-right tabular-nums">{diff > 0 ? `+${diff}` : diff}</td>
-                      <td className="px-1.5 py-1 text-right font-digits text-lg leading-none">{row.points}</td>
+                      <td className="py-1 text-right tabular-nums">{row.played}</td>
+                      <td className="py-1 text-right tabular-nums">{diff > 0 ? `+${diff}` : diff}</td>
+                      <td className="py-1 text-right font-display text-lg leading-none text-ink">{row.points}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1.5 text-[10px] text-dim">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-0.5 bg-gold" /> champions
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-0.5 bg-flood" /> champions league
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-0.5 bg-kit" /> relegation
-              </span>
-            </div>
+            <p className="mt-2 font-type text-[11px] text-ink-faint">top four above the black line · bottom three below the red one</p>
           </section>
         </div>
       </div>
@@ -735,20 +798,22 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
         type="button"
         onClick={rerollTeam}
         disabled={spinning || teamRerolls <= 0}
-        className={`glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        className={`press flex items-center justify-center gap-2 border-2 border-ink bg-ink text-sheet disabled:opacity-35 ${compact ? "flex-1 px-2 py-2" : "px-3.5 py-2 shadow-[3px_3px_0_var(--color-red)]"}`}
         title="New club and a new player from it"
       >
-        {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-xl leading-none text-flood">{teamRerolls}</span>
-        {compact ? null : <Key>T</Key>}
+        <span className="font-display text-base tracking-wide uppercase sm:text-lg">{compact ? "New club" : "Reroll team"}</span>
+        <span className="bg-sheet px-1.5 font-type text-sm font-bold text-ink">{teamRerolls}</span>
+        {compact ? null : <span className="inline-grid h-5 min-w-5 place-items-center border border-sheet/40 px-1 font-type text-[11px] leading-none text-sheet/70">T</span>}
       </button>
       <button
         type="button"
         onClick={rerollPlayer}
         disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
-        className={`glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        className={`press flex items-center justify-center gap-2 border-2 border-ink bg-sheet text-ink disabled:opacity-35 ${compact ? "flex-1 px-2 py-2" : "px-3.5 py-2 shadow-[3px_3px_0_var(--color-sky)]"}`}
         title={`Another ${rolled.teamName} player`}
       >
-        {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-xl leading-none text-kit">{playerRerolls}</span>
+        <span className="font-display text-base tracking-wide uppercase sm:text-lg">{compact ? "New player" : "Reroll player"}</span>
+        <span className="bg-sky px-1.5 font-type text-sm font-bold text-sheet">{playerRerolls}</span>
         {compact ? null : <Key>Y</Key>}
       </button>
     </>
@@ -757,50 +822,43 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   const latestDone = quests.done[quests.done.length - 1];
 
   return (
-    <div className="crt min-h-screen bg-night pb-24 font-ui text-chalk lg:pb-0">
+    <div className="newsprint min-h-screen pb-24 font-body text-ink lg:pb-0">
       {header}
       {toastNode}
-      <div className="relative hidden sm:block">
-        <PixelStadium className="h-20 opacity-90 lg:h-24" />
-        <p className="absolute inset-x-0 bottom-2.5 text-center text-xs text-chalk/80">── {complete ? "ten pulls done. one footballer. allegedly." : ROUND_LINES[taken]}</p>
-      </div>
 
-      <div className="mx-auto grid max-w-[1320px] 2xl:max-w-[1560px] gap-3 px-3 py-3 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:px-5 xl:grid-cols-[320px_minmax(0,1fr)_320px] 2xl:grid-cols-[360px_minmax(0,1fr)_360px]">
-        <div className="contents lg:flex lg:flex-col lg:gap-3">
-          <section className="pixel-frame order-1 bg-turf lg:order-none">
-            <p className="hidden border-b border-line px-4 py-2 font-pixel text-[11px] tracking-[0.3em] text-haze lg:block">YOU ROLLED</p>
+      <div className="mx-auto grid max-w-[1320px] gap-5 px-3 py-4 sm:px-5 lg:grid-cols-[300px_minmax(0,1fr)_290px] lg:py-6 xl:grid-cols-[320px_minmax(0,1fr)_310px] 2xl:max-w-[1560px] 2xl:grid-cols-[360px_minmax(0,1fr)_340px]">
+        <div className="contents lg:flex lg:flex-col lg:gap-5">
+          <section className="sticker order-1 lg:order-none">
             <div key={rollSpin ? "spin" : `card-${rollCount}`} className={`flex gap-3 p-3 lg:block lg:p-0 ${rollSpin ? "" : "animate-card-pop"}`}>
-              <div className="relative size-28 shrink-0 overflow-hidden border border-line bg-[linear-gradient(180deg,#14284a_0%,#0b1424_100%)] sm:size-36 lg:mx-3 lg:mt-3 lg:aspect-[4/3.4] lg:size-auto">
+              <div className="halftone relative size-28 shrink-0 overflow-hidden border-2 border-ink sm:size-36 lg:aspect-[4/3.6] lg:size-auto lg:border-0 lg:border-b-2">
                 {rollSpin ? (
                   <div className="absolute inset-0 grid place-items-center">
-                    <div className="animate-roll-glow absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(94,230,255,0.32),transparent_60%)]" />
-                    <p className="relative font-pixel text-4xl text-flood lg:text-6xl">?</p>
+                    <p className="animate-roll-glow font-display text-6xl text-sheet lg:text-8xl">?</p>
                   </div>
                 ) : (
                   <>
                     <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
-                    <div className="absolute top-2 right-2 hidden border border-line bg-night/85 px-2 py-1 text-center lg:block">
-                      <p className="font-pixel text-[9px] tracking-widest text-haze">OVR</p>
-                      <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
-                      <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
+                    <div className="absolute top-2.5 right-2.5 hidden size-[74px] rotate-6 flex-col items-center justify-center rounded-full border-[3px] border-sheet bg-red text-sheet shadow-[2px_2px_0_var(--color-ink)] lg:flex">
+                      <span className="font-display text-3xl leading-none">{rolled.overall}</span>
+                      <span className="font-type text-[10px] font-bold">{rolled.eaPosition}</span>
                     </div>
-                    <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 font-pixel text-[8px] tracking-widest lg:top-2 lg:left-2 lg:text-[9px] ${rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}>
-                      {rolled.role.toUpperCase()}
-                    </span>
+                    <span className={`absolute top-2 left-2 px-1.5 py-0.5 font-type text-[10px] font-bold uppercase lg:text-[11px] ${rolled.role === "First team" ? "bg-marker text-ink" : "bg-sheet text-ink"}`}>{rolled.role}</span>
                   </>
                 )}
               </div>
               <div className="min-w-0 flex-1 self-center lg:px-4 lg:pt-3 lg:pb-4">
-                <h1 className={`font-digits text-3xl leading-none uppercase sm:text-4xl ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
-                <p className="mt-1.5 truncate font-pixel text-[10px] tracking-[0.2em] text-kit sm:text-[11px]">{(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}</p>
+                <h1 className={`font-display text-3xl leading-[0.95] tracking-wide uppercase sm:text-4xl ${rollSpin ? "animate-ticker text-red" : "text-ink"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
+                <p className="mt-1 truncate font-type text-sm font-bold text-red">{rollSpin ? rollSpin.subtitle : rolled.teamName}</p>
                 {!rollSpin ? (
                   <>
-                    <p className="mt-2 flex items-baseline gap-2 lg:hidden">
-                      <span className={`font-digits text-3xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</span>
-                      <span className="font-pixel text-[9px] tracking-widest text-haze">OVR · {rolled.eaPosition}</span>
-                    </p>
-                    <p className="mt-2 text-[11px] text-haze lg:mt-3">
-                      {rolled.appearances} apps · {rolled.minutes}&apos; · {rolled.goals}g · {rolled.assists}a
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="font-display text-2xl leading-none lg:hidden">
+                        {rolled.overall} <span className="font-type text-xs font-bold text-ink-soft">{rolled.eaPosition}</span>
+                      </span>
+                      <FormChip delta={rolled.formDelta} />
+                    </div>
+                    <p className="mt-2 font-type text-xs text-ink-soft">
+                      {rolled.appearances} apps · {rolled.minutes} mins · {rolled.goals}g {rolled.assists}a · EA {rolled.eaOverall}
                     </p>
                   </>
                 ) : null}
@@ -808,77 +866,78 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
             </div>
           </section>
 
-          <section className="pixel-frame order-3 bg-turf p-3 lg:order-none">
-            <div className="flex items-baseline justify-between gap-2 px-0.5">
-              <p className="font-pixel text-[11px] tracking-[0.3em] text-gold">QUESTS</p>
-              <p className="text-[10px] text-dim">{quests.done.length} done · rewards are rerolls</p>
+          <section className="sticker lined order-3 p-4 lg:order-none">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="font-display text-2xl tracking-wide uppercase">Quests</p>
+              <p className="font-type text-[11px] text-ink-soft">{quests.done.length} done · paid in rerolls</p>
             </div>
-            <div className="mt-2 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-1">
+            <ul className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
               {quests.active.map((active) => {
                 const quest = questById(active.id);
                 const progress = complete ? 0 : questProgress(active, lockedStats, lastRerollAt);
                 return (
-                  <div key={`${active.id}-${active.since}`} className={`border px-2.5 py-2 ${complete ? "border-line/60 opacity-50" : "animate-tile-in border-line bg-stand"}`}>
+                  <li key={`${active.id}-${active.since}`} className={`border-2 border-ink bg-sheet px-3 py-2 ${complete ? "opacity-45" : "animate-tile-in"}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-pixel text-[10px] tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
+                      <p className="font-body text-sm font-bold leading-tight">{quest.title}</p>
                       <RewardChip reward={quest.reward} muted={complete} />
                     </div>
-                    <p className="mt-0.5 text-[10px] leading-snug text-haze">{quest.detail.toLowerCase()}</p>
-                    <div className="mt-1.5 flex gap-0.5">
+                    <p className="mt-0.5 font-type text-xs leading-snug text-ink-soft">{quest.detail.toLowerCase()}</p>
+                    <div className="mt-1.5 flex items-center gap-1">
                       {Array.from({ length: quest.target }, (_, index) => (
-                        <span key={index} className={`h-1 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
+                        <span key={index} className={`grid size-4 place-items-center border-2 border-ink text-[10px] leading-none font-bold ${index < progress ? "bg-red text-sheet" : "bg-sheet"}`}>
+                          {index < progress ? "✕" : ""}
+                        </span>
                       ))}
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
             {quests.done.length ? (
-              <ul className="mt-2 space-y-1">
+              <ul className="mt-2 space-y-0.5 font-type text-xs">
                 {quests.done.map((done) => (
-                  <li key={done.id} className={`flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-dim ${done === latestDone ? "animate-quest-done" : ""}`}>
-                    <span>
-                      <span className="text-grass">✓</span> {questById(done.id).title.toLowerCase()}
-                    </span>
-                    <span className="text-gold/80">{done.banked ? "banked" : rewardText(questById(done.id).reward)}</span>
+                  <li key={done.id} className={`flex items-center justify-between gap-2 px-1 ${done === latestDone ? "animate-quest-done" : ""}`}>
+                    <span className="text-ink-soft line-through decoration-red decoration-2">{questById(done.id).title.toLowerCase()}</span>
+                    <span className="font-bold text-red">{done.banked ? "banked" : rewardText(questById(done.id).reward)}</span>
                   </li>
                 ))}
               </ul>
             ) : null}
-            <p className="mt-2 px-0.5 text-[10px] text-dim">
+            <p className="mt-2 font-type text-[11px] text-ink-faint">
               {complete ? "build complete. quests closed for this run." : "the streak quest resets whenever you reroll."}
-              {hasBank ? <span className="text-gold/80"> banked for next run: {rewardText(bank)}.</span> : null}
+              {hasBank ? <span className="font-bold text-ink"> banked for next run: {rewardText(bank)}.</span> : null}
             </p>
           </section>
         </div>
 
-        <section className="pixel-frame order-2 bg-turf p-3 sm:p-4 lg:order-none">
-          <div className="border border-line bg-night/50 px-4 py-3 text-center sm:py-4">
-            <p className="font-pixel text-[10px] tracking-[0.35em] text-haze">{complete ? "BUILD COMPLETE" : `PICK ${round} OF 10`}</p>
-            <h2 className="mt-1.5 font-pixel text-lg tracking-[0.12em] text-chalk sm:text-2xl">{complete ? "SIGN FOR A CLUB" : rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}</h2>
+        <section className="order-2 min-w-0 lg:order-none">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="font-type text-sm text-ink-soft">{complete ? "the monster is finished." : rollSpin ? "the scouts are rummaging…" : lastPick ? `last stitch: ${lastPick.value} ${lastPick.label.toLowerCase()} from ${lastPick.playerName}` : ROUND_LINES[taken]}</p>
+              <h2 className="font-display text-4xl leading-none tracking-wide uppercase sm:text-5xl">
+                {complete ? (
+                  "Sign for a club"
+                ) : (
+                  <>
+                    Steal <span className="marker px-1">one</span> stat
+                  </>
+                )}
+              </h2>
+            </div>
             {!complete ? (
-              <div key={denied} className={`mt-4 hidden flex-wrap justify-center gap-2 lg:flex ${denied ? "animate-shake" : ""}`}>
+              <div key={denied} className={`hidden gap-3 lg:flex ${denied ? "animate-shake" : ""}`}>
                 {rerollButtons(false)}
               </div>
-            ) : null}
-            {lastPick && !complete ? (
-              <p key={`${lastPick.key}-${taken}`} className="animate-tile-in mt-2 text-[11px] text-haze lg:mt-3">
-                last pull: <span className={tier(lastPick.value).text}>{lastPick.value} {lastPick.label.toLowerCase()}</span> from {lastPick.playerName}
-              </p>
-            ) : !complete ? (
-              <p className="mt-2 text-[11px] text-haze sm:hidden">── {ROUND_LINES[taken]}</p>
             ) : null}
           </div>
 
           {!complete ? (
             <>
-              <p className="mt-3 truncate font-pixel text-[10px] tracking-[0.25em] text-haze sm:mt-4">
-                CHOOSE ONE FROM <span className="text-flood">{rollSpin ? "…" : rolled.name.toUpperCase()}</span>
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2">
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3">
                 {rolled.stats.map((stat, index) => {
                   const owned = locked[stat.key];
                   const info = tier(stat.value);
+                  const delta = stat.value - stat.ea;
                   return (
                     <button
                       key={`${stat.key}-${rollCount}`}
@@ -886,53 +945,67 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       disabled={spinning}
                       onClick={() => choose(stat)}
                       style={{ animationDelay: `${index * 30}ms` }}
-                      className={`group relative min-w-0 border px-2.5 py-2 text-left transition sm:px-3 ${spinning ? "" : "animate-tile-in"} ${
-                        owned ? "cursor-not-allowed border-line/60 bg-night/40" : "border-line bg-stand hover:-translate-y-0.5 hover:border-flood hover:bg-[#13223b] active:translate-y-0"
-                      }`}
+                      className={`relative min-w-0 overflow-hidden px-3 py-2.5 text-left ${spinning ? "sticker-sm" : "animate-tile-in"} ${owned ? "cursor-not-allowed border-2 border-dashed border-ink-faint bg-paper/60" : "sticker-sm press"}`}
                     >
                       <span className="flex items-start justify-between gap-2">
                         <span className="min-w-0">
-                          <span className={`block truncate font-pixel text-[10px] tracking-[0.12em] sm:text-xs sm:tracking-[0.15em] ${owned ? "text-dim" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
-                          <span className={`mt-0.5 block truncate text-[10px] text-dim ${owned ? "" : "hidden sm:block"}`}>{owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}</span>
+                          <span className={`block truncate font-display text-lg leading-none tracking-wide uppercase sm:text-xl ${owned ? "text-ink-faint" : "text-ink"}`}>{stat.label}</span>
+                          <span className="mt-1 hidden truncate font-type text-[11px] text-ink-soft sm:block">{stat.detail.toLowerCase()}</span>
                         </span>
                         <Key className="hidden lg:inline-grid">{index === 9 ? 0 : index + 1}</Key>
                       </span>
-                      <span className="mt-1 flex items-end justify-between gap-1">
-                        <span className={`truncate font-pixel text-[8px] tracking-widest sm:text-[9px] ${owned || spinning ? "text-transparent" : info.text} opacity-80`}>{info.label.toUpperCase()}</span>
-                        {spinning ? (
-                          <span className="animate-roll-glow font-digits text-4xl leading-none text-dim sm:text-5xl">??</span>
+                      <span className="mt-1.5 flex items-end justify-between gap-1">
+                        {owned || spinning ? (
+                          <span />
                         ) : (
-                          <span className={`font-digits text-4xl leading-none sm:text-5xl ${owned ? "text-dim line-through decoration-1" : info.text}`}>{stat.value}</span>
+                          <span className="font-type text-[10px] leading-tight text-ink-faint sm:text-[11px]">
+                            <span className={`block font-bold ${info.text}`}>{info.label.toLowerCase()}</span>
+                            <span className="hidden sm:block">
+                              <StatSource stat={stat} />
+                            </span>
+                            <span className="sm:hidden">{stat.form === null ? "EA only" : delta === 0 ? "as rated" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} form`}</span>
+                          </span>
+                        )}
+                        {spinning ? (
+                          <span className="animate-roll-glow font-display text-5xl leading-none text-ink-faint sm:text-6xl">??</span>
+                        ) : (
+                          <span className={`font-display text-5xl leading-none sm:text-6xl ${owned ? "text-ink-faint/60" : info.text}`}>{stat.value}</span>
                         )}
                       </span>
+                      {owned && !spinning ? (
+                        <span className="pointer-events-none absolute inset-0 grid place-items-center">
+                          <span className="-rotate-12 border-[3px] border-red bg-sheet/85 px-2 py-0.5 text-center text-red">
+                            <span className="block font-display text-xl leading-none tracking-widest uppercase">Taken</span>
+                            <span className="block max-w-[9rem] truncate font-type text-[10px] font-bold">{owned.playerName}</span>
+                          </span>
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-3 hidden text-[10px] tracking-wide text-dim lg:block">1–0 to pick · T new club · Y same club, new player · M mute</p>
+              <p className="mt-3 hidden font-type text-xs text-ink-faint lg:block">keys: 1–0 pick · T new club · Y same club, new player · M mute</p>
             </>
           ) : profile ? (
-            <div className="mt-4 border border-line bg-night/50 p-4">
+            <div className="sticker mt-4 p-5 sm:p-6">
               {!club || spin?.kind === "club" ? (
                 <div className="text-center">
-                  <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">THE LAST ROLL</p>
-                  <p className={`mt-3 min-h-12 font-digits text-4xl uppercase sm:text-5xl ${spin?.kind === "club" ? "animate-ticker text-flood" : "text-dim"}`}>{spin?.kind === "club" ? spin.title : "which club signs you?"}</p>
-                  <button type="button" onClick={rollClub} disabled={spinning} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand disabled:opacity-40">
-                    ▶ ROLL YOUR CLUB ◀
+                  <p className="font-type text-sm text-ink-soft">the last roll. who&apos;s brave enough?</p>
+                  <p className={`mt-3 min-h-14 font-display text-5xl leading-none uppercase sm:text-6xl ${spin?.kind === "club" ? "animate-ticker text-red" : "text-ink-faint"}`}>{spin?.kind === "club" ? spin.title : "which club signs him?"}</p>
+                  <button type="button" onClick={rollClub} disabled={spinning} className="sticker press mt-5 w-full bg-red py-3.5 font-display text-2xl tracking-wide text-sheet uppercase disabled:opacity-40">
+                    Roll your club
                   </button>
                 </div>
               ) : (
                 <div key={`club-${rollCount}`} className="animate-card-pop text-center">
-                  <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">YOU SIGN FOR</p>
-                  <p className="title-split mt-2 font-pixel text-2xl tracking-[0.08em] text-chalk sm:text-3xl">{club.name.toUpperCase()}</p>
-                  <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-haze">
-                    attack {profile.attack.toFixed(1)} · defence {profile.defense.toFixed(1)}.{replaced ? ` ${replaced.name} (${replaced.overall}) is dropped to make room.` : ""}
+                  <p className="font-type text-sm text-ink-soft">signed, sealed, stitched. you join</p>
+                  <p className="mt-1 font-display text-5xl leading-none tracking-wide text-red uppercase sm:text-6xl">{club.name}</p>
+                  <p className="mx-auto mt-3 max-w-md font-type text-sm leading-relaxed text-ink-soft">
+                    attack {profile.attack.toFixed(1)} · defence {profile.defense.toFixed(1)}.{replaced ? ` ${replaced.name} (${replaced.overall}) is dropped to make room. he's fuming.` : ""}
                   </p>
-                  <p className="mx-auto mt-2 max-w-md text-[11px] text-dim">
-                    season bonus: <span className="text-gold/80">champions +2 team +2 player · top four +1 each · top seven +1 player</span>
-                  </p>
-                  <button type="button" onClick={playSeason} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand">
-                    ▶ PLAY 38 MATCHWEEKS ◀
+                  <p className="mx-auto mt-2 max-w-md font-type text-xs text-ink-faint">season bonus: champions +2 team +2 player · top four +1 each · top seven +1 player</p>
+                  <button type="button" onClick={playSeason} className="sticker press mt-5 w-full bg-pitch py-3.5 font-display text-2xl tracking-wide text-sheet uppercase">
+                    Play 38 matchweeks
                   </button>
                 </div>
               )}
@@ -940,56 +1013,57 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           ) : null}
         </section>
 
-        <section className="pixel-frame order-4 bg-turf p-3 lg:order-none">
-          <div className="flex items-end justify-between border-b border-line px-1 pb-3">
+        <section className="sticker order-4 p-4 lg:order-none lg:self-start">
+          <div className="flex items-end justify-between border-b-2 border-ink pb-2">
             <div>
-              <p className="font-pixel text-[11px] tracking-[0.3em] text-haze">YOUR BUILD</p>
-              <p className="mt-1 text-[10px] text-dim">{taken} / 10 attributes</p>
+              <p className="font-display text-2xl leading-none tracking-wide uppercase">The monster</p>
+              <p className="mt-1 font-type text-xs text-ink-soft">{taken} of 10 parts sewn on</p>
             </div>
             <div className="text-right">
-              <p className={`font-digits text-5xl leading-none lg:text-6xl ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
-              <p className={`font-pixel text-[9px] tracking-widest ${taken ? tier(rating).text : "text-dim"}`}>{taken ? tier(rating).label.toUpperCase() : "UNBUILT"}</p>
+              <p className={`font-display text-6xl leading-none ${taken ? tier(rating).text : "text-rule"}`}>{taken ? rating : "--"}</p>
+              <p className={`font-type text-[11px] font-bold ${taken ? tier(rating).text : "text-ink-faint"}`}>{taken ? tier(rating).label.toLowerCase() : "unbuilt"}</p>
             </div>
           </div>
-          <div className="mt-2 grid grid-cols-5 gap-1 lg:grid-cols-1 lg:gap-1.5">
+          <div className="mt-3 grid grid-cols-5 gap-1.5 lg:grid-cols-1">
             {BUILD_STATS.map((definition) => {
               const slot = locked[definition.key];
               return (
                 <div
                   key={definition.key}
                   title={slot ? `${definition.label} ${slot.value} · ${slot.playerName}` : definition.label}
-                  className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"}`}
+                  className={`flex flex-col items-center gap-0.5 px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-2 border-ink bg-sheet" : "border-2 border-dashed border-rule"}`}
                 >
                   <div className="min-w-0 text-center lg:text-left">
-                    <p className={`font-pixel text-[9px] tracking-[0.12em] lg:text-[10px] lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
+                    <p className={`font-type text-[10px] font-bold uppercase lg:text-xs ${slot ? "text-ink" : "text-ink-faint"}`}>
                       <span className="lg:hidden">{SHORT_LABEL[definition.key]}</span>
-                      <span className="hidden lg:inline">{definition.label.toUpperCase()}</span>
+                      <span className="hidden lg:inline">{definition.label}</span>
                     </p>
-                    <p className="hidden truncate text-[10px] text-dim lg:block">{slot ? slot.playerName : "open"}</p>
+                    <p className="hidden truncate font-type text-[11px] text-ink-soft lg:block">{slot ? `from ${slot.playerName}` : "stick here"}</p>
                   </div>
-                  <p className={`font-digits text-2xl leading-none lg:text-3xl ${slot ? tier(slot.value).text : "text-line"}`}>{slot ? slot.value : "--"}</p>
+                  <p className={`font-display text-2xl leading-none lg:text-3xl ${slot ? tier(slot.value).text : "text-rule"}`}>{slot ? slot.value : "--"}</p>
                 </div>
               );
             })}
           </div>
-          <div className="mt-3 flex gap-1" aria-hidden="true">
+          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 font-type text-[10px] text-ink-soft">
             {TIERS.map((item) => (
-              <span key={item.label} className="flex flex-1 flex-col items-center gap-1">
-                <span className={`h-1 w-full ${item.bg}`} />
-                <span className="text-[8px] text-dim">{item.min ? `${item.min}+` : "<70"}</span>
+              <span key={item.label} className="flex items-center gap-1">
+                <span className={`size-2 ${item.bg}`} /> {item.min ? `${item.min}+` : "<70"} {item.label.toLowerCase()}
               </span>
             ))}
           </div>
         </section>
       </div>
-      <footer className="mx-auto max-w-[1320px] 2xl:max-w-[1560px] px-4 pb-6 text-[10px] text-dim lg:px-5">ratings: EA SPORTS FC via ea.com · minutes &amp; goals: premierleague.com {data.season} · a fan project, not affiliated with either</footer>
+      <footer className="mx-auto max-w-[1320px] px-4 pb-6 font-type text-[11px] text-ink-faint sm:px-5 2xl:max-w-[1560px]">
+        stats = EA SPORTS FC rating blended with {data.season} league form (up to half weight from 900 minutes; pace has no season data, so it stays EA). ratings via ea.com · form via premierleague.com and fantasy premier league · a fan project.
+      </footer>
 
       {!complete ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-night/95 backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-ink bg-sheet lg:hidden">
           <div key={denied} className={`mx-auto flex max-w-xl items-center gap-2 px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] ${denied ? "animate-shake" : ""}`}>
             <div className="w-14 shrink-0 text-center">
-              <p className={`font-digits text-3xl leading-none ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
-              <p className="font-pixel text-[8px] tracking-widest text-dim">BUILD</p>
+              <p className={`font-display text-3xl leading-none ${taken ? tier(rating).text : "text-rule"}`}>{taken ? rating : "--"}</p>
+              <p className="font-type text-[10px] text-ink-soft">build</p>
             </div>
             {rerollButtons(true)}
           </div>
