@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { BookOpen, RotateCcw, Trophy, Volume2, VolumeX } from "lucide-react";
 import { PixelStadium } from "@/components/pixel-stadium";
-import { kitForTeam } from "@/lib/kits";
 import {
   ACTIVE_QUESTS,
   questById,
@@ -109,153 +109,21 @@ function verdict(place: number) {
   return { title: "Relegated", line: "the stitches didn't hold.", sound: "relegated" as const, color: "text-kit" };
 }
 
-function hexLuma(hex: string) {
-  const raw = hex.replace("#", "");
-  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
-  const n = Number.parseInt(full, 16);
-  if (Number.isNaN(n)) return 0.5;
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-}
-
-/** Flat 2D shirt-back with sleeves, surname and squad number. */
-function JerseyBack({
-  teamId,
-  teamName,
-  name,
-  number,
-  prime,
-}: {
-  teamId: number;
-  teamName: string;
-  name: string;
-  number: number | null;
-  prime?: boolean;
-}) {
-  const kit = kitForTeam(teamId);
-  const shown = number != null ? String(number) : "—";
-  const fillId = `kit-${teamId}-${name.replace(/\s+/g, "")}`;
-  const nameSize = name.length > 14 ? 10 : name.length > 10 ? 12 : 14;
-  // Light print or stripes need a dark outline so name/number stay readable.
-  const needsDarkOutline = Boolean(kit.stripe) || hexLuma(kit.number) > 0.55 || hexLuma(kit.primary) > 0.65;
-  const textStroke = needsDarkOutline ? "#0a0a0a" : "rgba(0,0,0,0.45)";
-  const nameStroke = needsDarkOutline ? 2.1 : 1.1;
-  const numberStroke = needsDarkOutline ? 3.2 : 1.6;
-  const nameProps = {
-    fill: kit.number,
-    stroke: textStroke,
-    strokeWidth: nameStroke,
-    paintOrder: "stroke fill" as const,
-    style: { fontFamily: "var(--nf-display), Arial Narrow, sans-serif" },
-  };
-  const numberProps = {
-    fill: kit.number,
-    stroke: textStroke,
-    strokeWidth: numberStroke,
-    paintOrder: "stroke fill" as const,
-    style: { fontFamily: "var(--nf-condensed), Arial Narrow, sans-serif", fontWeight: 700 },
-  };
-  return (
-    <div
-      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_35%,#123024_0%,#06140e_72%)] px-2 py-2 sm:px-3"
-      aria-label={`${name} ${shown}, ${teamName}`}
-    >
-      <svg
-        viewBox="0 0 260 200"
-        className="h-auto w-full max-h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.55)]"
-        role="img"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        <defs>
-          {kit.stripe ? (
-            <pattern id={fillId} width="16" height="16" patternUnits="userSpaceOnUse">
-              <rect width="16" height="16" fill={kit.primary} />
-              <rect x="8" width="8" height="16" fill={kit.stripe} />
-            </pattern>
-          ) : (
-            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={kit.primary} />
-              <stop offset="100%" stopColor={kit.primary} stopOpacity="0.92" />
-            </linearGradient>
-          )}
-        </defs>
-
-        {/* Broad matchday silhouette — wide torso, short sleeves (kit-icon style) */}
-        <path
-          d="M88 36
-             L98 14
-             L114 28
-             L130 28
-             L146 14
-             L156 36
-             L248 52
-             L234 98
-             L182 78
-             L182 178
-             L78 178
-             L78 78
-             L26 98
-             L12 52
-             Z"
-          fill={`url(#${fillId})`}
-          stroke={kit.secondary}
-          strokeWidth="2.4"
-          strokeLinejoin="round"
-        />
-
-        {/* collar */}
-        <ellipse cx="130" cy="26" rx="20" ry="11" fill="#06140e" />
-        <path d="M110 28 Q130 44 150 28" fill="none" stroke={kit.secondary} strokeWidth="2" />
-
-        {/* cuff accents */}
-        <path d="M12 52 L26 98" fill="none" stroke={kit.secondary} strokeWidth="3" strokeLinecap="round" />
-        <path d="M248 52 L234 98" fill="none" stroke={kit.secondary} strokeWidth="3" strokeLinecap="round" />
-
-        {/* side seams + hem */}
-        <path d="M78 78 L78 178" fill="none" stroke={kit.secondary} strokeWidth="1.1" opacity="0.28" />
-        <path d="M182 78 L182 178" fill="none" stroke={kit.secondary} strokeWidth="1.1" opacity="0.28" />
-        <path d="M78 178 L182 178" fill="none" stroke={kit.secondary} strokeWidth="2" opacity="0.55" />
-
-        <text x="130" y="68" textAnchor="middle" fontSize={nameSize} letterSpacing="1.8" {...nameProps}>
-          {name}
-        </text>
-        <text
-          x="130"
-          y="136"
-          textAnchor="middle"
-          fontSize={shown.length > 1 ? 58 : 68}
-          letterSpacing="1"
-          {...numberProps}
-        >
-          {shown}
-        </text>
-
-        {prime ? (
-          <g>
-            <rect x="62" y="148" width="136" height="28" fill="#ff5a3c" stroke="#0a0a0a" strokeWidth="1.4" />
-            <text
-              x="130"
-              y="168"
-              textAnchor="middle"
-              fill="#06140e"
-              fontSize="18"
-              letterSpacing="3"
-              fontWeight={700}
-              style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
-            >
-              PRIME
-            </text>
-          </g>
-        ) : null}
-      </svg>
-    </div>
-  );
+function Portrait({ url, name }: { url: string | null; name: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) {
+    const initials = name
+      .split(" ")
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join("");
+    return <p className="absolute inset-0 grid place-items-center font-pixel text-4xl text-line lg:text-6xl">{initials}</p>;
+  }
+  return <Image src={url} alt={name} fill unoptimized loading="eager" sizes="280px" className="object-contain object-bottom" onError={() => setFailed(true)} />;
 }
 
 function Key({ children, className = "inline-grid" }: { children: React.ReactNode; className?: string }) {
-  return <span className={`h-5 min-w-5 place-items-center border border-line bg-night px-1 font-ui text-[10px] text-haze ${className}`}>{children}</span>;
+  return <span className={`h-5 min-w-5 place-items-center border border-line bg-night px-1 font-ui text-[11px] text-haze ${className}`}>{children}</span>;
 }
 
 function IconButton({ label, onClick, href, children }: { label: string; onClick?: () => void; href?: string; children: React.ReactNode }) {
@@ -283,7 +151,7 @@ function IconButton({ label, onClick, href, children }: { label: string; onClick
 }
 
 function RewardChip({ reward, muted = false }: { reward: Reward; muted?: boolean }) {
-  return <span className={`shrink-0 font-pixel text-[9px] tracking-[0.12em] ${muted ? "text-dim" : "text-gold"}`}>{rewardText(reward).toUpperCase()}</span>;
+  return <span className={`shrink-0 font-pixel text-[11px] tracking-[0.12em] ${muted ? "text-dim" : "text-gold"}`}>{rewardText(reward).toUpperCase()}</span>;
 }
 
 function ChemBar({ hint, compact = false, tip }: { hint: ChemHint; compact?: boolean; tip?: string }) {
@@ -293,12 +161,12 @@ function ChemBar({ hint, compact = false, tip }: { hint: ChemHint; compact?: boo
   return (
     <div className={`group/chem relative ${compact ? "" : "z-10"}`}>
       <div
-        className={`relative overflow-hidden bg-night/85 ${compact ? "h-[15px]" : "h-5"}`}
+        className={`relative overflow-hidden bg-night/85 ${compact ? "h-4" : "h-6"}`}
         title={howto}
       >
         <div className={`absolute inset-y-0 left-0 ${fill}`} style={{ width: `${Math.max(ratio * 100, 12)}%` }} />
         <p
-          className={`relative z-[1] truncate px-1.5 font-pixel tracking-[0.04em] ${compact ? "text-[9px] leading-[15px]" : "text-[10px] leading-5"} ${
+          className={`relative z-[1] truncate px-1.5 font-pixel tracking-[0.04em] ${compact ? "text-[10px] leading-4" : "text-[11px] leading-6"} ${
             hint.complete || ratio >= 0.4 ? "text-night" : "text-chalk"
           }`}
         >
@@ -307,11 +175,11 @@ function ChemBar({ hint, compact = false, tip }: { hint: ChemHint; compact?: boo
       </div>
       {!compact && howto ? (
         <div className="pointer-events-none absolute right-0 bottom-full z-30 mb-1 hidden w-[min(240px,70vw)] border border-line bg-night px-2.5 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] group-hover/chem:block">
-          <p className="font-pixel text-[9px] tracking-[0.18em] text-grass">
+          <p className="font-pixel text-[10px] tracking-[0.18em] text-grass">
             {hint.label.toUpperCase()} {hint.current}/{hint.target}
           </p>
-          <p className="mt-1 text-[11px] leading-snug text-chalk/90">{howto}</p>
-          {!hint.complete ? <p className="mt-1 text-[10px] text-gold">+{hint.boost} when complete</p> : null}
+          <p className="mt-1 text-xs leading-snug text-chalk/90">{howto}</p>
+          {!hint.complete ? <p className="mt-1 text-[11px] text-gold">+{hint.boost} when complete</p> : null}
         </div>
       ) : null}
     </div>
@@ -682,7 +550,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
         </button>
         {phase === "build" ? (
           <div className="min-w-0 text-center">
-            <p className="font-pixel text-[9px] tracking-[0.12em] whitespace-nowrap text-chalk sm:text-sm sm:tracking-[0.3em]">
+            <p className="font-pixel text-[11px] tracking-[0.14em] whitespace-nowrap text-chalk sm:text-sm sm:tracking-[0.3em]">
               {complete ? "BUILT" : `ROUND ${round}/10`}
             </p>
             <div className="mt-1 flex justify-center gap-0.5 sm:gap-1">
@@ -764,7 +632,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       if (event.key === "Enter") event.currentTarget.blur();
                     }}
                     maxLength={24}
-                    className="mt-1 w-full max-w-xs border-b border-line bg-transparent font-digits text-3xl uppercase outline-none placeholder:text-dim focus:border-flood sm:text-4xl"
+                    className="mt-1 w-full max-w-xs border-b border-line bg-transparent font-digits text-4xl uppercase outline-none placeholder:text-dim focus:border-flood"
                     placeholder="NAME"
                     aria-label="Manager name"
                   />
@@ -781,8 +649,8 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   { label: "primes", value: String(career.primesSeen) },
                 ].map((stat) => (
                   <div key={stat.label} className="border border-line bg-night/50 px-2 py-2 text-center sm:px-3">
-                    <p className="font-pixel text-[8px] tracking-[0.18em] text-haze sm:text-[9px]">{stat.label.toUpperCase()}</p>
-                    <p className="font-digits text-2xl leading-none text-chalk sm:text-3xl">{stat.value}</p>
+                    <p className="font-pixel text-[9px] tracking-[0.2em] text-haze">{stat.label.toUpperCase()}</p>
+                    <p className="font-digits text-3xl leading-none text-chalk">{stat.value}</p>
                   </div>
                 ))}
               </div>
@@ -1025,10 +893,10 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           if (!spinning && teamRerolls > 0) sfx().play("click");
         }}
         disabled={spinning || teamRerolls <= 0}
-        className={`btn-game glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        className={`btn-game glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[11px]" : "px-3 py-2 text-xs"}`}
         title="New club and a new player from it"
       >
-        {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-xl leading-none text-flood">{teamRerolls}</span>
+        {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-2xl leading-none text-flood">{teamRerolls}</span>
         {compact ? null : <Key>T</Key>}
       </button>
       <button
@@ -1039,10 +907,10 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           if (!spinning && playerRerolls > 0 && clubPool.length >= 2) sfx().play("click");
         }}
         disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
-        className={`btn-game glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        className={`btn-game glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[11px]" : "px-3 py-2 text-xs"}`}
         title={`Another ${rolled.teamName} player`}
       >
-        {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-xl leading-none text-kit">{playerRerolls}</span>
+        {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-2xl leading-none text-kit">{playerRerolls}</span>
         {compact ? null : <Key>Y</Key>}
       </button>
     </>
@@ -1063,7 +931,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       <div className="mx-auto grid max-w-[1320px] 2xl:max-w-[1560px] gap-3 px-3 py-3 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:px-5 xl:grid-cols-[320px_minmax(0,1fr)_320px] 2xl:grid-cols-[360px_minmax(0,1fr)_360px]">
         <div className="contents lg:flex lg:flex-col lg:gap-3">
           <section className="pixel-frame order-1 bg-turf lg:order-none">
-            <p className="hidden border-b border-line px-4 py-2 font-pixel text-[11px] tracking-[0.3em] text-haze lg:block">YOU ROLLED</p>
+            <p className="hidden border-b border-line px-4 py-2 font-pixel text-xs tracking-[0.3em] text-haze lg:block">YOU ROLLED</p>
             <div key={rollSpin ? "spin" : `card-${rollCount}`} className={`flex gap-3 p-3 lg:block lg:p-0 ${rollSpin ? "" : "animate-card-pop"}`}>
               <div className="relative size-28 shrink-0 overflow-hidden border border-line bg-[linear-gradient(180deg,#14284a_0%,#0b1424_100%)] sm:size-36 lg:mx-3 lg:mt-3 lg:aspect-[4/3.4] lg:size-auto">
                 {rollSpin ? (
@@ -1073,36 +941,29 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   </div>
                 ) : (
                   <>
-                    <JerseyBack
-                      key={rolled.id}
-                      teamId={rolled.teamId}
-                      teamName={rolled.teamName}
-                      name={rolled.jerseyName}
-                      number={rolled.shirtNumber}
-                      prime={rolled.prime}
-                    />
+                    <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
                     <div className="absolute top-2 right-2 hidden border border-line bg-night/85 px-2 py-1 text-center lg:block">
-                      <p className="font-pixel text-[9px] tracking-widest text-haze">OVR</p>
+                      <p className="font-pixel text-[10px] tracking-widest text-haze">OVR</p>
                       <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
-                      <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
+                      <p className="font-pixel text-[11px] text-chalk">{rolled.eaPosition}</p>
                     </div>
-                    <span className={`absolute top-1.5 left-1.5 font-pixel tracking-widest lg:top-2 lg:left-2 ${rolled.prime ? "bg-kit px-2.5 py-1.5 text-[13px] text-night sm:text-[14px] lg:px-3 lg:py-2 lg:text-[15px]" : `px-1.5 py-0.5 text-[8px] lg:text-[9px] ${rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}`}>
+                    <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 font-pixel text-[9px] tracking-widest lg:top-2 lg:left-2 lg:text-[10px] ${rolled.prime ? "bg-kit text-night" : rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}>
                       {rolled.prime ? "PRIME" : rolled.role.toUpperCase()}
                     </span>
                   </>
                 )}
               </div>
               <div className="min-w-0 flex-1 self-center lg:px-4 lg:pt-3 lg:pb-4">
-                <h1 className={`font-digits text-3xl leading-none uppercase sm:text-4xl ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
-                <p className="mt-1.5 truncate font-pixel text-[10px] tracking-[0.2em] text-kit sm:text-[11px]">{(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}</p>
+                <h1 className={`font-digits text-4xl leading-none uppercase sm:text-5xl ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
+                <p className="mt-1.5 truncate font-pixel text-xs tracking-[0.2em] text-kit sm:text-sm">{(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}</p>
                 {!rollSpin ? (
                   <>
                     <p className="mt-2 flex flex-wrap items-center gap-2 lg:hidden">
-                      <span className={`font-digits text-3xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</span>
-                      <span className="font-pixel text-[9px] tracking-widest text-haze">OVR · {rolled.eaPosition}</span>
-                      {rolled.prime ? <span className="bg-kit px-2 py-1 font-pixel text-[12px] tracking-widest text-night">PRIME</span> : null}
+                      <span className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</span>
+                      <span className="font-pixel text-[11px] tracking-widest text-haze">OVR · {rolled.eaPosition}</span>
+                      {rolled.prime ? <span className="bg-kit px-1.5 py-0.5 font-pixel text-[9px] tracking-widest text-night">PRIME</span> : null}
                     </p>
-                    <p className="mt-2 text-[11px] text-haze lg:mt-3">
+                    <p className="mt-2 text-xs text-haze lg:mt-3">
                       {rolled.nationality ?? "—"} · {rolled.appearances} apps · {rolled.minutes}&apos; · {rolled.goals}g · {rolled.assists}a · EA {rolled.eaOverall}
                       {rolled.formDelta ? ` · form ${rolled.formDelta > 0 ? "+" : ""}${rolled.formDelta}` : ""}
                     </p>
@@ -1121,8 +982,8 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
 
           <section className="pixel-frame order-3 bg-turf p-3 lg:order-none">
             <div className="flex items-baseline justify-between gap-2 px-0.5">
-              <p className="font-pixel text-[11px] tracking-[0.3em] text-gold">QUESTS</p>
-              <p className="text-[10px] text-dim">{quests.done.length} done · tap for how</p>
+              <p className="font-pixel text-xs tracking-[0.3em] text-gold">QUESTS</p>
+              <p className="text-[11px] text-dim">{quests.done.length} done · tap for how</p>
             </div>
             <div className="mt-2 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-1">
               {quests.active.map((active) => {
@@ -1142,7 +1003,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     className={`btn-game border px-2.5 py-2 text-left ${complete ? "border-line/60 opacity-50" : open ? "animate-tile-in border-flood bg-stand" : "animate-tile-in border-line bg-stand hover:border-flood/70"}`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-pixel text-[10px] tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
+                      <p className="font-pixel text-xs tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
                       <RewardChip reward={quest.reward} muted={complete} />
                     </div>
                     <div className="mt-1.5 flex gap-0.5">
@@ -1152,8 +1013,8 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     </div>
                     {open ? (
                       <div className="mt-2 border-t border-line/80 pt-2">
-                        <p className="text-[11px] leading-snug text-chalk/90">{quest.detail}</p>
-                        <p className="mt-1 text-[10px] text-haze">
+                        <p className="text-xs leading-snug text-chalk/90">{quest.detail}</p>
+                        <p className="mt-1 text-[11px] text-haze">
                           {progress}/{quest.target}
                           {quest.id === "streak" ? " · resets if you reroll" : ""}
                         </p>
@@ -1181,8 +1042,8 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
 
         <section className="pixel-frame order-2 bg-turf p-3 sm:p-4 lg:order-none">
           <div className="border border-line bg-night/50 px-4 py-3 text-center sm:py-4">
-            <p className="font-pixel text-[10px] tracking-[0.35em] text-haze">{complete ? "BUILD COMPLETE" : `PICK ${round} OF 10`}</p>
-            <h2 className="mt-1.5 font-pixel text-lg tracking-[0.12em] text-chalk sm:text-2xl">{complete ? "SIGN FOR A CLUB" : rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}</h2>
+            <p className="font-pixel text-xs tracking-[0.35em] text-haze">{complete ? "BUILD COMPLETE" : `PICK ${round} OF 10`}</p>
+            <h2 className="mt-1.5 font-pixel text-xl tracking-[0.12em] text-chalk sm:text-2xl">{complete ? "SIGN FOR A CLUB" : rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}</h2>
             {!complete ? (
               <div key={denied} className={`mt-4 hidden flex-wrap justify-center gap-2 lg:flex ${denied ? "animate-shake" : ""}`}>
                 {rerollButtons(false)}
@@ -1199,7 +1060,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
 
           {!complete ? (
             <>
-              <p className="mt-3 truncate font-pixel text-[10px] tracking-[0.25em] text-haze sm:mt-4">
+              <p className="mt-3 truncate font-pixel text-xs tracking-[0.25em] text-haze sm:mt-4">
                 CHOOSE ONE FROM <span className="text-flood">{rollSpin ? "…" : rolled.name.toUpperCase()}</span>
               </p>
               <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2">
@@ -1228,8 +1089,8 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     >
                       <span className="flex items-start justify-between gap-2">
                         <span className="min-w-0">
-                          <span className={`block truncate font-pixel text-[10px] tracking-[0.12em] sm:text-xs sm:tracking-[0.15em] ${owned ? "text-haze" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
-                          <span className={`mt-0.5 block truncate text-[11px] ${owned ? "text-haze" : "text-chalk/75"} ${owned ? "" : "hidden sm:block"}`}>
+                          <span className={`block truncate font-pixel text-xs tracking-[0.12em] sm:text-sm sm:tracking-[0.15em] ${owned ? "text-haze" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
+                          <span className={`mt-0.5 block truncate text-xs ${owned ? "text-haze" : "text-chalk/75"} ${owned ? "" : "hidden sm:block"}`}>
                             {owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}
                           </span>
                         </span>
@@ -1239,9 +1100,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                         {owned || spinning ? (
                           <span />
                         ) : (
-                          <span className="min-w-0 font-pixel text-[10px] tracking-widest sm:text-[11px]">
+                          <span className="min-w-0 font-pixel text-[11px] tracking-widest sm:text-xs">
                             <span className={`block ${info.text}`}>{info.label.toUpperCase()}</span>
-                            <span className="mt-0.5 block truncate text-[11px] normal-case tracking-normal text-chalk/80">
+                            <span className="mt-0.5 block truncate text-xs normal-case tracking-normal text-chalk/80">
                               {stat.form === null ? `EA ${stat.ea}` : `EA ${stat.ea} · form ${stat.form}`}
                               {delta ? ` · ${delta > 0 ? "+" : "−"}${Math.abs(delta)}` : ""}
                             </span>
@@ -1309,15 +1170,15 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
         <section className="pixel-frame order-4 bg-turf p-3 lg:order-none">
           <div className="flex items-end justify-between border-b border-line px-1 pb-3">
             <div>
-              <p className="font-pixel text-[11px] tracking-[0.3em] text-haze">YOUR BUILD</p>
-              <p className="mt-1 text-[10px] text-dim">
+              <p className="font-pixel text-xs tracking-[0.3em] text-haze">YOUR BUILD</p>
+              <p className="mt-1 text-[11px] text-dim">
                 {taken} / 10 attributes
                 {chemistry.links.length ? ` · ${chemistry.links.length} chem` : ""}
               </p>
             </div>
             <div className="text-right">
               <p className={`font-digits text-5xl leading-none lg:text-6xl ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
-              <p className={`font-pixel text-[9px] tracking-widest ${taken ? tier(rating).text : "text-dim"}`}>{taken ? tier(rating).label.toUpperCase() : "UNBUILT"}</p>
+              <p className={`font-pixel text-[10px] tracking-widest ${taken ? tier(rating).text : "text-dim"}`}>{taken ? tier(rating).label.toUpperCase() : "UNBUILT"}</p>
             </div>
           </div>
           <div className="mt-2 grid grid-cols-5 gap-1 lg:grid-cols-1 lg:gap-1.5">
@@ -1332,11 +1193,11 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"} ${chem ? "border-grass/60" : ""}`}
                 >
                   <div className="min-w-0 text-center lg:text-left">
-                    <p className={`font-pixel text-[9px] tracking-[0.12em] lg:text-[10px] lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
+                    <p className={`font-pixel text-[10px] tracking-[0.12em] lg:text-xs lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
                       <span className="lg:hidden">{SHORT_LABEL[definition.key]}</span>
                       <span className="hidden lg:inline">{definition.label.toUpperCase()}</span>
                     </p>
-                    <p className="hidden truncate text-[10px] text-dim lg:block">{slot ? `${slot.playerName}${chem ? ` · +${chem}` : ""}` : "open"}</p>
+                    <p className="hidden truncate text-[11px] text-dim lg:block">{slot ? `${slot.playerName}${chem ? ` · +${chem}` : ""}` : "open"}</p>
                   </div>
                   <p className={`font-digits text-2xl leading-none lg:text-3xl ${shown !== null ? tier(shown).text : "text-line"}`}>{shown ?? "--"}</p>
                 </div>
@@ -1344,7 +1205,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
             })}
           </div>
           <div className="mt-3 border-t border-line pt-2">
-            <p className="font-pixel text-[10px] tracking-[0.25em] text-grass">CHEMISTRY</p>
+            <p className="font-pixel text-xs tracking-[0.25em] text-grass">CHEMISTRY</p>
             {chemistry.links.length ? (
               <ul className="mt-1.5 space-y-1">
                 {chemistry.links.map((link) => (
@@ -1366,7 +1227,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 ))}
               </ul>
             ) : (
-              <p className="mt-1.5 text-[10px] text-dim">bars light up as teammates x/3 once you stack clubmates, internationals or a back line.</p>
+              <p className="mt-1.5 text-[11px] text-dim">bars light up as teammates x/3 once you stack clubmates, internationals or a back line.</p>
             )}
           </div>
           <div className="mt-3 flex gap-1" aria-hidden="true">

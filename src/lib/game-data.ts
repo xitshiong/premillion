@@ -143,7 +143,7 @@ export function getGameData(): GameData {
       eaOverall: rating.overall,
       formDelta,
       prime: false,
-      avatarUrl: null,
+      avatarUrl: rating.avatarUrl,
       shirtNumber: player.shirtNumber,
       jerseyName: jerseyName(player.name),
       teamId: player.teamId,
