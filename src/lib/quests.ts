@@ -12,6 +12,7 @@ export type PickRecord = RollStat & {
   overall: number;
   goals: number;
   assists: number;
+  minutes: number;
   prime?: boolean;
 };
 
@@ -33,15 +34,30 @@ const countWhere = (test: (pick: PickRecord) => boolean) => (picks: PickRecord[]
 
 export const QUESTS: QuestDef[] = [
   { id: "world", title: "World class", detail: "Lock any stat rated 90+", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.value >= 90) },
-  { id: "prime", title: "In his prime", detail: "Take a stat from a prime player", target: 1, reward: { team: 1, player: 1 }, count: countWhere((pick) => Boolean((pick as PickRecord & { prime?: boolean }).prime)) },
+  { id: "prime", title: "In his prime", detail: "Take a stat from a prime player", target: 1, reward: { team: 1, player: 1 }, count: countWhere((pick) => Boolean(pick.prime)) },
   { id: "bench", title: "Off the bench", detail: "Take a stat from a bench player", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.role === "Bench") },
   { id: "backline", title: "Built from the back", detail: "Take 2 stats from defenders", target: 2, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.position === "D") },
   { id: "engine", title: "Engine room", detail: "Take 2 stats from midfielders", target: 2, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.position === "M") },
+  { id: "attackers", title: "Front men", detail: "Take 2 stats from forwards", target: 2, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.position === "F") },
+  { id: "gloves", title: "Between the sticks", detail: "Take a stat from a goalkeeper", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.position === "G") },
   { id: "scorer", title: "Goal getter", detail: "Take a stat from a player with 2+ league goals", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.goals >= 2) },
   { id: "creator", title: "Creator", detail: "Take a stat from a player with 2+ league assists", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.assists >= 2) },
+  { id: "both-ends", title: "Both ends", detail: "Take a stat from a player with a goal and an assist", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.goals >= 1 && pick.assists >= 1) },
   { id: "rapid", title: "Rapid", detail: "Lock pace at 85+", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.key === "pac" && pick.value >= 85) },
+  { id: "tank", title: "Brick wall", detail: "Lock defending at 85+", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.key === "def" && pick.value >= 85) },
+  { id: "visionary", title: "Quarterback", detail: "Lock vision at 85+", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.key === "vision" && pick.value >= 85) },
+  { id: "aerial", title: "Won in the air", detail: "Lock heading at 85+", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.key === "headingAccuracy" && pick.value >= 85) },
   { id: "diamond", title: "Rough diamond", detail: "Take an 80+ stat from a player rated 75 or lower", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.value >= 80 && pick.overall <= 75) },
   { id: "elite", title: "Elite pair", detail: "Lock two stats rated 85+", target: 2, reward: { team: 0, player: 2 }, count: countWhere((pick) => pick.value >= 85) },
+  { id: "passport", title: "Passport control", detail: "Take 3 stats from the same nationality", target: 3, reward: { team: 1, player: 1 }, count: (picks) => {
+      const nations = new Map<string, number>();
+      for (const pick of picks) {
+        if (!pick.nationality) continue;
+        nations.set(pick.nationality, (nations.get(pick.nationality) ?? 0) + 1);
+      }
+      return Math.max(0, ...nations.values(), 0);
+    },
+  },
   {
     id: "loyal",
     title: "One-club man",
@@ -51,9 +67,22 @@ export const QUESTS: QuestDef[] = [
     count: (picks) => {
       const clubs = new Map<number, number>();
       for (const pick of picks) clubs.set(pick.teamId, (clubs.get(pick.teamId) ?? 0) + 1);
-      return Math.max(0, ...clubs.values());
+      return Math.max(0, ...clubs.values(), 0);
     },
   },
+  {
+    id: "clubhouse",
+    title: "Clubhouse",
+    detail: "Take 4 stats from the same club",
+    target: 4,
+    reward: { team: 2, player: 1 },
+    count: (picks) => {
+      const clubs = new Map<number, number>();
+      for (const pick of picks) clubs.set(pick.teamId, (clubs.get(pick.teamId) ?? 0) + 1);
+      return Math.max(0, ...clubs.values(), 0);
+    },
+  },
+  { id: "minutes", title: "Workhorse", detail: "Take a stat from a player with 700+ league minutes", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.minutes >= 700) },
 ];
 
 const QUEST_BY_ID = new Map(QUESTS.map((quest) => [quest.id, quest]));

@@ -40,6 +40,7 @@
   --animate-quest-done: quest-done 900ms ease-out both;
   --animate-btn-pulse: btn-pulse 1.7s ease-in-out infinite;
   --animate-btn-pop: btn-pop 280ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  --animate-chem-pop: chem-pop 1100ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 
   @keyframes toast {
     0% { opacity: 0; transform: translate(-50%, -14px) scale(0.9); }
@@ -101,6 +102,12 @@
   @keyframes btn-pop {
     0% { transform: scale(0.94); }
     100% { transform: scale(1); }
+  }
+  @keyframes chem-pop {
+    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); }
+    18% { opacity: 1; transform: translate(-50%, -2px) scale(1.18); }
+    40% { opacity: 1; transform: translate(-50%, -10px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -28px) scale(0.92); }
   }
 }
 
@@ -216,7 +223,7 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-card-pop, .animate-tile-in, .animate-slot-fill, .animate-ticker, .animate-roll-glow,
   .animate-flicker, .animate-bob, .animate-blink, .animate-shake, .animate-quest-done,
-  .btn-pulse,
+  .animate-chem-pop, .btn-pulse,
   .pitch-run, .pitch-run-rev, .pitch-run-slow, .pitch-kick, .pitch-ball, .pitch-ball-spin, .pitch-keeper {
     animation: none;
   }

@@ -30,6 +30,7 @@ export const POSITION_KEYS: Record<string, BuildStatKey[]> = {
   D: ["def", "phy", "reactions", "headingAccuracy"],
   M: ["pas", "dri", "vision", "pac"],
   F: ["sho", "finishing", "pac", "dri"],
+  G: ["reactions", "pas", "def", "phy"],
 };
 
 export type RollStat = {

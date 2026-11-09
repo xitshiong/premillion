@@ -229,6 +229,8 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   const [sawPrime, setSawPrime] = useState(false);
   const [freshUnlocks, setFreshUnlocks] = useState<AchievementId[]>([]);
   const [openQuestId, setOpenQuestId] = useState<string | null>(null);
+  const [chemPops, setChemPops] = useState<{ id: number; key: string; delta: number }[]>([]);
+  const chemPopId = useRef(0);
 
   function maybePrime(player: RollPlayer, random: () => number = Math.random) {
     if (random() >= PRIME_CHANCE) return player;
@@ -371,6 +373,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   function choose(stat: RollStat) {
     if (phase !== "build" || spinning || complete) return;
     if (locked[stat.key]) return deny();
+    const beforeBoosts = withChemistry(Object.values(locked)).boosts;
     const entry: PickRecord = {
       ...stat,
       order: taken,
@@ -384,10 +387,26 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       overall: rolled.overall,
       goals: rolled.goals,
       assists: rolled.assists,
+      minutes: rolled.minutes,
       prime: rolled.prime,
     };
     const next = { ...locked, [stat.key]: entry };
     const picks = Object.values(next);
+    const after = withChemistry(picks);
+    const pops: { id: number; key: string; delta: number }[] = [];
+    for (const [key, value] of after.boosts) {
+      const prev = beforeBoosts.get(key) ?? 0;
+      if (value > prev) {
+        chemPopId.current += 1;
+        pops.push({ id: chemPopId.current, key, delta: value - prev });
+      }
+    }
+    if (pops.length) {
+      setChemPops((list) => [...list, ...pops]);
+      const popIds = pops.map((pop) => pop.id);
+      setTimeout(() => setChemPops((list) => list.filter((pop) => !popIds.includes(pop.id))), 1200);
+      setTimeout(() => sfx().play("quest"), 80);
+    }
     setLocked(next);
     setLastPick(entry);
     sfx().play(stat.value >= 90 ? "pick-world" : stat.value >= 85 ? "pick-elite" : "pick");
@@ -1188,11 +1207,12 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
               const slot = locked[definition.key];
               const chem = chemistry.boosts.get(definition.key) ?? 0;
               const shown = slot ? Math.min(99, slot.value + chem) : null;
+              const pops = chemPops.filter((pop) => pop.key === definition.key);
               return (
                 <div
                   key={definition.key}
                   title={slot ? `${definition.label} ${shown}${chem ? ` (+${chem} chem)` : ""} · ${slot.playerName}` : definition.label}
-                  className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"} ${chem ? "border-grass/60" : ""}`}
+                  className={`relative flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"} ${chem ? "border-grass/60" : ""}`}
                 >
                   <div className="min-w-0 text-center lg:text-left">
                     <p className={`font-pixel text-[10px] tracking-[0.12em] lg:text-xs lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
@@ -1201,7 +1221,17 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     </p>
                     <p className="hidden truncate text-[11px] text-dim lg:block">{slot ? `${slot.playerName}${chem ? ` · +${chem}` : ""}` : "open"}</p>
                   </div>
-                  <p className={`font-digits text-2xl leading-none lg:text-3xl ${shown !== null ? tier(shown).text : "text-line"}`}>{shown ?? "--"}</p>
+                  <div className="relative">
+                    <p className={`font-digits text-2xl leading-none lg:text-3xl ${shown !== null ? tier(shown).text : "text-line"}`}>{shown ?? "--"}</p>
+                    {pops.map((pop) => (
+                      <span
+                        key={pop.id}
+                        className="animate-chem-pop pointer-events-none absolute top-0 left-1/2 z-20 font-digits text-lg text-gold drop-shadow-[0_1px_0_#04120c] lg:text-xl"
+                      >
+                        +{pop.delta}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               );
             })}
@@ -1229,7 +1259,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 ))}
               </ul>
             ) : (
-              <p className="mt-1.5 text-[11px] text-dim">bars light up as teammates x/3 once you stack clubmates, internationals or a back line.</p>
+              <p className="mt-1.5 text-[11px] text-dim">stack mates → teammates → clubhouse (5), best friends, gloves, nations and more for bigger boosts.</p>
             )}
           </div>
           <div className="mt-3 flex gap-1" aria-hidden="true">

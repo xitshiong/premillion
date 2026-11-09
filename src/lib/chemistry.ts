@@ -3,15 +3,21 @@ import type { PickRecord } from "@/lib/quests";
 import type { RollPlayer } from "@/lib/ratings";
 
 export type ChemTrackId =
+  | "mates"
   | "teammates"
+  | "clubhouse"
   | "nation"
-  | "club-country"
+  | "nation-five"
+  | "best-friends"
+  | "star-pair"
   | "back-line"
   | "engine"
   | "front-line"
+  | "gloves"
   | "primes"
   | "spine"
-  | "squad-depth";
+  | "squad-depth"
+  | "providers";
 
 export type ChemTrack = {
   id: ChemTrackId;
@@ -36,6 +42,8 @@ export type ChemPlayer = {
   position: string;
   role: "First team" | "Bench";
   prime?: boolean;
+  goals: number;
+  assists: number;
 };
 
 export type ChemHint = {
@@ -65,6 +73,11 @@ export type ChemLink = {
 const DEF_KEYS: BuildStatKey[] = ["def", "phy", "reactions", "headingAccuracy"];
 const MID_KEYS: BuildStatKey[] = ["pas", "dri", "vision", "pac"];
 const FWD_KEYS: BuildStatKey[] = ["sho", "finishing", "pac", "dri"];
+const GLOVE_KEYS: BuildStatKey[] = ["def", "phy", "reactions", "pas"];
+const CREATE_KEYS: BuildStatKey[] = ["pas", "vision", "dri", "finishing"];
+
+/** Soft ceiling so stacked chemistries stay strong without blowing past 99 instantly. */
+export const CHEM_BOOST_CAP = 8;
 
 function uniquePlayers(picks: PickRecord[]): ChemPlayer[] {
   const seen = new Map<number, ChemPlayer>();
@@ -78,6 +91,8 @@ function uniquePlayers(picks: PickRecord[]): ChemPlayer[] {
       position: pick.position,
       role: pick.role,
       prime: pick.prime,
+      goals: pick.goals,
+      assists: pick.assists,
     });
   }
   return [...seen.values()];
@@ -92,12 +107,26 @@ function asChemPlayer(player: RollPlayer): ChemPlayer {
     position: player.position,
     role: player.role,
     prime: player.prime,
+    goals: player.goals,
+    assists: player.assists,
   };
 }
 
 /** Fixed chemistry tracks with clear targets, shown as teammates 1/3 style bars. */
 export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
+  const clubShort = player.teamName.split(" ").slice(-1)[0] ?? player.teamName;
   return [
+    {
+      id: "mates",
+      label: "mates",
+      target: 2,
+      boost: 1,
+      keys: "all",
+      color: "bg-grass",
+      howto: `lock 2 players from ${player.teamName}`,
+      count: (players) => players.filter((item) => item.teamId === player.teamId).length,
+      includes: (item) => item.teamId === player.teamId,
+    },
     {
       id: "teammates",
       label: "teammates",
@@ -105,11 +134,21 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: "all",
       color: "bg-grass",
-      howto: `lock ${3} players from ${player.teamName}`,
+      howto: `lock 3 players from ${player.teamName}`,
       count: (players) => players.filter((item) => item.teamId === player.teamId).length,
       includes: (item) => item.teamId === player.teamId,
     },
-    // Note: label stays "teammates" on tiles as the hint; completed links can name the club in detail.
+    {
+      id: "clubhouse",
+      label: "clubhouse",
+      target: 5,
+      boost: 4,
+      keys: "all",
+      color: "bg-gold",
+      howto: `lock 5 players from ${player.teamName} · big club chem`,
+      count: (players) => players.filter((item) => item.teamId === player.teamId).length,
+      includes: (item) => item.teamId === player.teamId,
+    },
     {
       id: "nation",
       label: player.nationality ? player.nationality.toLowerCase() : "nation",
@@ -122,18 +161,40 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       includes: (item) => Boolean(player.nationality && item.nationality === player.nationality),
     },
     {
-      id: "club-country",
-      label: "club & country",
+      id: "nation-five",
+      label: player.nationality ? `${player.nationality.toLowerCase()} five` : "nation five",
+      target: 5,
+      boost: 3,
+      keys: "all",
+      color: "bg-flood",
+      howto: player.nationality ? `lock 5 players from ${player.nationality}` : "lock 5 players from the same country",
+      count: (players) => players.filter((item) => item.nationality && item.nationality === player.nationality).length,
+      includes: (item) => Boolean(player.nationality && item.nationality === player.nationality),
+    },
+    {
+      id: "best-friends",
+      label: "best friends",
       target: 2,
-      boost: 2,
+      boost: 3,
       keys: "all",
       color: "bg-gold",
       howto: player.nationality
-        ? `lock 2 ${player.nationality} players at ${player.teamName}`
-        : `lock 2 players who share club and country at ${player.teamName}`,
+        ? `lock 2 ${player.nationality} mates at ${clubShort}`
+        : `lock 2 club-and-country pairs at ${clubShort}`,
       count: (players) =>
         players.filter((item) => item.teamId === player.teamId && item.nationality && item.nationality === player.nationality).length,
       includes: (item) => item.teamId === player.teamId && Boolean(player.nationality && item.nationality === player.nationality),
+    },
+    {
+      id: "star-pair",
+      label: "star pair",
+      target: 2,
+      boost: 2,
+      keys: "all",
+      color: "bg-kit",
+      howto: `lock 2 first-team ${clubShort} players`,
+      count: (players) => players.filter((item) => item.teamId === player.teamId && item.role === "First team").length,
+      includes: (item) => item.teamId === player.teamId && item.role === "First team",
     },
     {
       id: "back-line",
@@ -169,6 +230,33 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       includes: (item) => item.position === "F",
     },
     {
+      id: "gloves",
+      label: "gloves",
+      target: 3,
+      boost: 2,
+      keys: GLOVE_KEYS,
+      color: "bg-flood",
+      howto: "lock 1 keeper + 2 defenders · boosts defending, physical, reactions, passing",
+      count: (players) => {
+        const keepers = players.filter((item) => item.position === "G").length;
+        const defenders = players.filter((item) => item.position === "D").length;
+        if (!keepers) return 0;
+        return 1 + Math.min(2, defenders);
+      },
+      includes: (item) => item.position === "G" || item.position === "D",
+    },
+    {
+      id: "providers",
+      label: "providers",
+      target: 2,
+      boost: 2,
+      keys: CREATE_KEYS,
+      color: "bg-gold",
+      howto: "lock 2 players with a league goal and an assist · creation chem",
+      count: (players) => players.filter((item) => item.goals >= 1 && item.assists >= 1).length,
+      includes: (item) => item.goals >= 1 && item.assists >= 1,
+    },
+    {
       id: "primes",
       label: "primes",
       target: 2,
@@ -202,7 +290,8 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       keys: "all",
       color: "bg-grass",
       howto: "lock a defender, a midfielder and a forward",
-      count: (players) => new Set(players.map((item) => item.position).filter((position) => position === "D" || position === "M" || position === "F")).size,
+      count: (players) =>
+        new Set(players.map((item) => item.position).filter((position) => position === "D" || position === "M" || position === "F")).size,
       includes: (item) => item.position === "D" || item.position === "M" || item.position === "F",
     },
   ];
@@ -223,6 +312,15 @@ function trackProgress(track: ChemTrack, players: ChemPlayer[]): ChemHint {
   };
 }
 
+function linkKey(track: ChemTrack, player: ChemPlayer) {
+  if (track.id === "mates" || track.id === "teammates" || track.id === "clubhouse" || track.id === "star-pair") {
+    return `${track.id}-${player.teamId}`;
+  }
+  if (track.id === "nation" || track.id === "nation-five") return `${track.id}-${player.nationality}`;
+  if (track.id === "best-friends") return `best-friends-${player.teamId}-${player.nationality}`;
+  return track.id;
+}
+
 /** Active / completed chemistry for the build panel. */
 export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
   const players = uniquePlayers(picks);
@@ -232,32 +330,31 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
 
   for (const player of players) {
     for (const track of chemTracksFor(player)) {
-      const key =
-        track.id === "teammates"
-          ? `teammates-${player.teamId}`
-          : track.id === "nation"
-            ? `nation-${player.nationality}`
-            : track.id === "club-country"
-              ? `club-country-${player.teamId}-${player.nationality}`
-              : track.id;
+      const key = linkKey(track, player);
       if (seen.has(key)) continue;
       const hint = trackProgress(track, players);
-      const minShow = track.id === "spine" || track.id === "squad-depth" ? track.target : 2;
+      const minShow =
+        track.id === "spine" || track.id === "squad-depth" || track.id === "mates" || track.id === "best-friends" || track.id === "star-pair"
+          ? track.target
+          : track.id === "gloves" || track.id === "providers"
+            ? 2
+            : Math.min(2, track.target);
       if (hint.current < minShow) continue;
       const memberIds = players.filter((item) => track.includes(item)).map((item) => item.playerId);
-      if (memberIds.length < 2 && track.id !== "spine" && track.id !== "squad-depth") continue;
+      if (memberIds.length < 2 && track.id !== "spine" && track.id !== "squad-depth" && track.id !== "gloves") continue;
       seen.add(key);
       const title =
-        track.id === "teammates"
-          ? `teammates · ${player.teamName.split(" ").slice(-1)[0]?.toLowerCase()}`
-          : track.id === "nation"
-            ? (player.nationality ?? "nation").toLowerCase()
+        track.id === "mates" || track.id === "teammates" || track.id === "clubhouse" || track.id === "star-pair"
+          ? `${track.label} · ${player.teamName.split(" ").slice(-1)[0]?.toLowerCase()}`
+          : track.id === "nation" || track.id === "nation-five"
+            ? track.label
             : track.label;
       links.push({
         id: key,
         title,
         detail: `${hint.current}/${hint.target}`,
         howto: hint.howto,
+        // Incomplete high-tier tracks still drip a little chem once they appear.
         boost: hint.complete ? track.boost : Math.max(1, Math.floor(track.boost / 2)),
         keys: track.keys,
         playerIds: memberIds,
@@ -273,14 +370,41 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
 
 /** Tracks that belong on attribute tiles — clubmates / nation / lines, not meta spine/squad. */
 const TILE_TRACKS = new Set<ChemTrackId>([
+  "mates",
   "teammates",
+  "clubhouse",
   "nation",
-  "club-country",
+  "nation-five",
+  "best-friends",
+  "star-pair",
   "back-line",
   "engine",
   "front-line",
+  "gloves",
+  "providers",
   "primes",
 ]);
+
+const TILE_PREFER: ChemTrackId[] = [
+  "clubhouse",
+  "teammates",
+  "mates",
+  "best-friends",
+  "star-pair",
+  "nation-five",
+  "nation",
+  "gloves",
+  "providers",
+  "primes",
+  "back-line",
+  "engine",
+  "front-line",
+];
+
+function preferTrack(id: ChemTrackId) {
+  const index = TILE_PREFER.indexOf(id);
+  return index === -1 ? 99 : index;
+}
 
 /**
  * Progress bars for the rolled player's attribute tiles.
@@ -299,11 +423,9 @@ export function tileChemHint(rolled: RollPlayer, picks: PickRecord[], statKey: B
     .filter((hint) => hint.current > 0);
 
   if (!hints.length) return null;
-  const prefer = (id: ChemTrackId) =>
-    id === "teammates" ? 0 : id === "nation" ? 1 : id === "club-country" ? 2 : id === "primes" ? 3 : 4;
   hints.sort((a, b) => {
     if (a.complete !== b.complete) return a.complete ? 1 : -1;
-    if (prefer(a.id) !== prefer(b.id)) return prefer(a.id) - prefer(b.id);
+    if (preferTrack(a.id) !== preferTrack(b.id)) return preferTrack(a.id) - preferTrack(b.id);
     return b.current / b.target - a.current / a.target || b.current - a.current;
   });
   return hints[0];
@@ -323,11 +445,7 @@ export function rolledChemHints(rolled: RollPlayer, picks: PickRecord[]): ChemHi
     if (hint.current <= 0) continue;
     hints.push(hint);
   }
-  return hints.sort((a, b) => {
-    const prefer = (id: ChemTrackId) =>
-      id === "teammates" ? 0 : id === "nation" ? 1 : id === "club-country" ? 2 : id === "primes" ? 3 : 4;
-    return prefer(a.id) - prefer(b.id) || b.current / b.target - a.current / a.target;
-  });
+  return hints.sort((a, b) => preferTrack(a.id) - preferTrack(b.id) || b.current / b.target - a.current / a.target);
 }
 
 export function chemistryBoosts(picks: PickRecord[], links = evaluateChemistry(picks)) {
@@ -339,7 +457,7 @@ export function chemistryBoosts(picks: PickRecord[], links = evaluateChemistry(p
       if (link.keys !== "all" && !link.keys.includes(pick.key)) continue;
       total += link.boost;
     }
-    boosts.set(pick.key, Math.min(4, total));
+    boosts.set(pick.key, Math.min(CHEM_BOOST_CAP, total));
   }
   return boosts;
 }

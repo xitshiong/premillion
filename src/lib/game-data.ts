@@ -31,8 +31,7 @@ type EaRating = {
 
 type EaFile = { fetchedAt: string; players: Record<string, EaRating> };
 
-const MIN_APPEARANCES = 3;
-const MIN_MINUTES = 270;
+/** Include anyone with an EA card — low-minute stars (Eze) and keepers still roll. */
 const FIRST_TEAM_APPEARANCES = 7;
 const CORE_SIZE = 10;
 
@@ -92,8 +91,8 @@ export function getGameData(): GameData {
 
   const candidates: Candidate[] = [];
   for (const player of players) {
-    if (player.teamConflict || (player.position !== "D" && player.position !== "M" && player.position !== "F")) continue;
-    if (player.appearances < MIN_APPEARANCES || player.minutes < MIN_MINUTES) continue;
+    if (player.teamConflict) continue;
+    if (player.position !== "D" && player.position !== "M" && player.position !== "F" && player.position !== "G") continue;
     const rating = ea.players[String(player.id)];
     if (!rating || BUILD_STATS.some((definition) => typeof rating.stats[definition.key] !== "number")) continue;
     const detail = getPlayer(String(player.id));
