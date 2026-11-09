@@ -164,12 +164,12 @@ function ChemBar({ hint, compact = false, tip }: { hint: ChemHint; compact?: boo
   return (
     <div className={`group/chem relative ${compact ? "" : "z-10"}`}>
       <div
-        className={`relative overflow-hidden border border-line/70 bg-night ${compact ? "h-5" : "h-7"}`}
+        className={`relative overflow-hidden border border-line/80 bg-night ${compact ? "h-6" : "h-8"}`}
         title={howto}
       >
         <div className={`absolute inset-y-0 left-0 ${fill}`} style={{ width: `${Math.max(ratio * 100, hint.current > 0 ? 18 : 0)}%` }} />
         <p
-          className={`relative z-[1] truncate px-2 font-pixel tracking-[0.06em] text-chalk ${compact ? "text-[11px] leading-5" : "text-xs leading-7"}`}
+          className={`relative z-[1] truncate px-2.5 font-pixel tracking-[0.08em] text-chalk ${compact ? "text-xs leading-6" : "text-sm leading-8"}`}
           style={{ textShadow: labelShadow }}
         >
           {hint.label.toUpperCase()} {hint.current}/{hint.target}
