@@ -17,9 +17,20 @@ export const BUILD_STATS = [
 
 export type BuildStatKey = (typeof BUILD_STATS)[number]["key"];
 
-/** Form counts for at most half of a stat, reaching that weight at FULL_FORM_MINUTES league minutes. */
-export const FORM_WEIGHT = 0.5;
+/** Form is a light nudge. At full minutes it is 28% of the rating; it cannot drag EA more than MAX_FORM_DRAG. */
+export const FORM_WEIGHT = 0.28;
 export const FULL_FORM_MINUTES = 900;
+export const MAX_FORM_DRAG = 5;
+export const MAX_FORM_BOOST = 10;
+/** Chance that a rolled player arrives in his prime (peak EA + best form). */
+export const PRIME_CHANCE = 0.12;
+
+/** Position primaries get a soft floor so a CB can't fall to 50 defending off a quiet tackle count. */
+export const POSITION_KEYS: Record<string, BuildStatKey[]> = {
+  D: ["def", "phy", "reactions", "headingAccuracy"],
+  M: ["pas", "dri", "vision", "pac"],
+  F: ["sho", "finishing", "pac", "dri"],
+};
 
 export type RollStat = {
   key: BuildStatKey;
@@ -38,6 +49,7 @@ export type RollPlayer = {
   overall: number;
   eaOverall: number;
   formDelta: number;
+  prime: boolean;
   avatarUrl: string | null;
   teamId: number;
   teamName: string;
@@ -69,6 +81,7 @@ export type GameData = {
   recordedMatches: number;
   coreSize: number;
   eaFetchedAt: string;
+  primeChance: number;
 };
 
 const ATTACK_KEYS: BuildStatKey[] = ["pac", "sho", "pas", "dri", "finishing", "vision"];
@@ -92,4 +105,27 @@ export function clubWithUser(club: ClubRating, user: { attack: number; defense: 
   const attack = (kept.reduce((sum, player) => sum + player.attack, 0) + user.attack) / (kept.length + 1);
   const defense = (kept.reduce((sum, player) => sum + player.defense, 0) + user.defense) / (kept.length + 1);
   return { attack, defense, replacedId: core[0]?.id ?? null };
+}
+
+/**
+ * Peak card for a roll: each stat is the better of EA and form, then primary position stats
+ * get a small lift toward the player's own highest EA attribute (never inventing a new ceiling).
+ */
+export function asPrime(player: RollPlayer): RollPlayer {
+  if (player.prime) return player;
+  const bestEa = Math.max(...player.stats.map((stat) => stat.ea));
+  const primaries = new Set(POSITION_KEYS[player.position] ?? []);
+  const stats = player.stats.map((stat) => {
+    const peak = Math.max(stat.ea, stat.form ?? stat.ea);
+    const lift = primaries.has(stat.key) ? Math.round((bestEa - peak) * 0.2) : 0;
+    return { ...stat, value: Math.min(99, Math.max(peak, peak + lift)) };
+  });
+  const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
+  return {
+    ...player,
+    prime: true,
+    overall: Math.min(99, player.eaOverall + Math.max(1, formDelta)),
+    formDelta,
+    stats,
+  };
 }

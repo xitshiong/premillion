@@ -1,7 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getIndex, getPlayer } from "@/lib/data";
-import { BUILD_STATS, FORM_WEIGHT, FULL_FORM_MINUTES, strengthFrom, type BuildStatKey, type ClubRating, type GameData, type RollPlayer, type RollStat } from "@/lib/ratings";
+import {
+  BUILD_STATS,
+  FORM_WEIGHT,
+  FULL_FORM_MINUTES,
+  MAX_FORM_BOOST,
+  MAX_FORM_DRAG,
+  POSITION_KEYS,
+  PRIME_CHANCE,
+  strengthFrom,
+  type BuildStatKey,
+  type ClubRating,
+  type GameData,
+  type RollPlayer,
+  type RollStat,
+} from "@/lib/ratings";
 
 export type { ClubRating, GameData, RollPlayer, RollStat };
 
@@ -35,19 +49,36 @@ type Candidate = {
   percentile: Partial<Record<BuildStatKey, number>>;
 };
 
-/** Mean percentile of the eligible season measures behind one stat, or undefined when none were published. */
 function formPercentile(rates: Map<string, number>, keys: readonly string[]) {
   const values = keys.map((key) => rates.get(key)).filter((value): value is number => typeof value === "number");
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : undefined;
 }
 
-/**
- * Converts a season percentile into a rating by reading the EA value at the same rank in the roll pool,
- * so a player in the league's 80th percentile for take-ons gets what an 80th-percentile EA dribbler has.
- */
 function quantile(sorted: number[], percentile: number) {
   const index = Math.round((percentile / 100) * (sorted.length - 1));
   return sorted[Math.min(sorted.length - 1, Math.max(0, index))];
+}
+
+/** Stretch high percentiles so excellent form can still produce world-class ratings. */
+function stretchPercentile(raw: number) {
+  return Math.min(100, Math.pow(raw / 100, 0.82) * 100);
+}
+
+function blendValue(ea: number, form: number | null, weight: number, primary: boolean) {
+  if (form === null) return ea;
+  const raw = Math.round((1 - weight) * ea + weight * form);
+  // World-class EA ratings never fall below 90; form can only polish them further.
+  const drag =
+    ea >= 90 ? 0 : ea >= 88 ? 2 : ea >= 85 ? 3 : primary ? Math.min(MAX_FORM_DRAG, 4) : MAX_FORM_DRAG;
+  const floor = ea - drag;
+  const ceiling = ea + MAX_FORM_BOOST;
+  let value = Math.min(ceiling, Math.max(floor, raw));
+  // Strong form can still reach the form rating itself when it beats EA.
+  if (form > ea) value = Math.max(value, Math.min(form, ea + MAX_FORM_BOOST));
+  // Soft floor for position primaries: never drop a rated starter attribute into the 50s.
+  if (primary && ea >= 75) value = Math.max(value, Math.min(ea, 72));
+  if (primary && ea >= 85) value = Math.max(value, Math.min(ea, 80));
+  return value;
 }
 
 let gameCache: GameData | null = null;
@@ -72,14 +103,14 @@ export function getGameData(): GameData {
     const percentile: Candidate["percentile"] = {};
     for (const definition of BUILD_STATS) {
       const value = formPercentile(rates, definition.form);
-      if (value !== undefined) percentile[definition.key] = value;
+      if (value !== undefined) percentile[definition.key] = stretchPercentile(value);
     }
     candidates.push({ player, rating, percentile });
   }
 
   const eaSorted = new Map(BUILD_STATS.map((definition) => [definition.key, candidates.map((item) => item.rating.stats[definition.key]).sort((a, b) => a - b)]));
 
-  // Averaging several percentiles pulls everyone toward the middle, so the averages are re-ranked within the pool.
+  // Re-rank averaged percentiles so the top formers stay near the top of the EA curve.
   for (const definition of BUILD_STATS) {
     const scored = candidates.filter((item) => item.percentile[definition.key] !== undefined);
     const sorted = scored.map((item) => item.percentile[definition.key]!).sort((a, b) => a - b);
@@ -93,11 +124,12 @@ export function getGameData(): GameData {
 
   const rollPlayers: RollPlayer[] = candidates.map(({ player, rating, percentile }) => {
     const weight = FORM_WEIGHT * Math.min(1, player.minutes / FULL_FORM_MINUTES);
+    const primaries = new Set(POSITION_KEYS[player.position ?? ""] ?? []);
     const stats: RollStat[] = BUILD_STATS.map((definition) => {
       const eaValue = rating.stats[definition.key];
       const rank = percentile[definition.key];
       const form = rank === undefined ? null : quantile(eaSorted.get(definition.key)!, rank);
-      const value = form === null ? eaValue : Math.round((1 - weight) * eaValue + weight * form);
+      const value = blendValue(eaValue, form, weight, primaries.has(definition.key));
       return { key: definition.key, label: definition.label, detail: definition.detail, value, ea: eaValue, form };
     });
     const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
@@ -109,6 +141,7 @@ export function getGameData(): GameData {
       overall: rating.overall + formDelta,
       eaOverall: rating.overall,
       formDelta,
+      prime: false,
       avatarUrl: rating.avatarUrl,
       teamId: player.teamId,
       teamName: teamName.get(player.teamId) ?? "Unknown",
@@ -143,6 +176,7 @@ export function getGameData(): GameData {
     recordedMatches,
     coreSize: CORE_SIZE,
     eaFetchedAt: ea.fetchedAt,
+    primeChance: PRIME_CHANCE,
   };
   return gameCache;
 }
