@@ -586,7 +586,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
         <div className="relative flex flex-1 flex-col">
           <div className="relative">
             <PixelStadium className="h-[32vh] min-h-[200px] sm:h-[42vh] sm:min-h-[260px]" />
-            <div className="absolute inset-x-0 top-[12%] px-4 text-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
               <h1 className="title-split animate-flicker font-pixel text-[12vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">FRANKENBALLER</h1>
               <p className="mt-3 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-[10px] tracking-[0.4em] text-flood sm:text-sm">{data.season}</p>
             </div>
