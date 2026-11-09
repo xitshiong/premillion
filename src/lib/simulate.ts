@@ -1,4 +1,4 @@
-import type { ClubRating } from "@/lib/ratings";
+import { clubWithUser, type ClubRating } from "@/lib/ratings";
 
 export type Fixture = { home: number; away: number };
 export type MatchResult = Fixture & { homeGoals: number; awayGoals: number; week: number };
@@ -56,10 +56,12 @@ function poisson(lambda: number, random: () => number) {
   return count - 1;
 }
 
-function expectedGoals(attack: number, defense: number, home: boolean, base: number) {
-  const floor = 20;
-  const rate = base * (Math.max(floor, attack) / Math.max(floor, defense)) * (home ? 1.1 : 0.9);
-  return Math.min(3.8, Math.max(0.15, rate));
+/** Goals change by about 9% per rating point of attack over the opponent's defence, each measured against the league average. */
+export const RATING_SENSITIVITY = 0.09;
+
+function expectedGoals(attackEdge: number, defenseEdge: number, home: boolean, base: number) {
+  const rate = base * Math.exp(RATING_SENSITIVITY * (attackEdge - defenseEdge)) * (home ? 1.1 : 0.9);
+  return Math.min(4, Math.max(0.2, rate));
 }
 
 export function simulateSeason(args: {
@@ -70,20 +72,19 @@ export function simulateSeason(args: {
   goalsPerTeamGame: number;
   seed: number;
 }) {
-  const ratings = new Map(args.clubs.map((club) => [club.id, club]));
-  const userClub = ratings.get(args.userClubId);
+  const userClub = args.clubs.find((club) => club.id === args.userClubId);
   if (!userClub) throw new Error("Missing club");
-  const attack = new Map<number, number>();
-  const defense = new Map<number, number>();
-  for (const club of args.clubs) {
-    if (club.id === args.userClubId) {
-      attack.set(club.id, (club.attack * club.squad + args.userAttack) / (club.squad + 1));
-      defense.set(club.id, (club.defense * club.squad + args.userDefense) / (club.squad + 1));
-    } else {
-      attack.set(club.id, club.attack);
-      defense.set(club.id, club.defense);
-    }
-  }
+  const boosted = clubWithUser(userClub, { attack: args.userAttack, defense: args.userDefense });
+  const rawAttack = new Map(args.clubs.map((club) => [club.id, club.id === userClub.id ? boosted.attack : club.attack]));
+  const rawDefense = new Map(args.clubs.map((club) => [club.id, club.id === userClub.id ? boosted.defense : club.defense]));
+  const meanOf = (values: Iterable<number>) => {
+    const list = [...values];
+    return list.reduce((sum, value) => sum + value, 0) / list.length;
+  };
+  const attackMean = meanOf(rawAttack.values());
+  const defenseMean = meanOf(rawDefense.values());
+  const attack = new Map([...rawAttack].map(([id, value]) => [id, value - attackMean]));
+  const defense = new Map([...rawDefense].map(([id, value]) => [id, value - defenseMean]));
 
   const random = mulberry32(args.seed);
   const weeks = seasonWeeks(args.clubs.map((club) => club.id));
@@ -91,11 +92,11 @@ export function simulateSeason(args: {
   weeks.forEach((week, index) => {
     for (const fixture of week) {
       const homeGoals = poisson(
-        expectedGoals(attack.get(fixture.home) ?? 50, defense.get(fixture.away) ?? 50, true, args.goalsPerTeamGame),
+        expectedGoals(attack.get(fixture.home) ?? 0, defense.get(fixture.away) ?? 0, true, args.goalsPerTeamGame),
         random,
       );
       const awayGoals = poisson(
-        expectedGoals(attack.get(fixture.away) ?? 50, defense.get(fixture.home) ?? 50, false, args.goalsPerTeamGame),
+        expectedGoals(attack.get(fixture.away) ?? 0, defense.get(fixture.home) ?? 0, false, args.goalsPerTeamGame),
         random,
       );
       matches.push({ ...fixture, homeGoals, awayGoals, week: index + 1 });

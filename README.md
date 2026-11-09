@@ -4,7 +4,11 @@ A database of the players on 2026/27 Premier League club lists, and a browser fo
 
 The season is still going. Gameweeks 1–9 were finished when the feeds were fetched. Gameweek 10 was the current gameweek and was not marked data-checked, so a few totals can still move. Rates are per 90 minutes, and a percentile is only stored once a player has 270 minutes.
 
-The home page is the build game. Roll a first-team or bench outfielder, take one of their ten percentiles, and repeat until the player is complete. Players with no minutes, and anyone under 270 minutes, are not in the roll. You get 8 player rerolls and 6 club rerolls. The big number is the percentile and the small number is the published rate. After ten picks, the 38 matchweeks are simulated: each club’s attack and defence come from those percentiles, a match becomes expected goals, and the score is drawn at random. It is a simulation, not a forecast.
+The home page is the build game. Each round rolls a club, then a player from that club, and you take one of his ten EA SPORTS FC ratings (pace, shooting, passing, dribbling, defending, physical, finishing, vision, reactions, heading). Reroll team (6) gives a new club and a new player. Reroll player (8) keeps the club. Only outfielders with at least 3 appearances and 270 Premier League minutes this season are in the roll. 7 or more appearances counts as first team, the rest as bench.
+
+After ten picks you roll the club you join, and all 38 matchweeks are simulated. Each club is rated from the EA ratings of its 10 most-used outfielders, and you replace the lowest-rated of them. A match turns attack against defence into expected goals at this season’s scoring rate, and the score is drawn at random. It is a simulation, not a forecast.
+
+The EA ratings come from `drop-api.ea.com/rating/ea-sports-fc`, the feed behind ea.com’s ratings page. Players are matched to the Premier League squads by birth date and name. Rebuild with `python3 scripts/fetch_ea_ratings.py` (`--refresh` downloads again). About 20 players with minutes have no EA entry and are left out of the roll.
 
 ## Where the numbers come from
 

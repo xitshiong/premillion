@@ -1,65 +1,78 @@
+import fs from "node:fs";
+import path from "node:path";
 import { getIndex } from "@/lib/data";
 import { BUILD_STATS, strengthFrom, type ClubRating, type GameData, type RollPlayer, type RollStat } from "@/lib/ratings";
 
 export type { ClubRating, GameData, RollPlayer, RollStat };
 
+type EaRating = {
+  eaId: number;
+  eaName: string;
+  overall: number;
+  position: string;
+  avatarUrl: string | null;
+  stats: Record<string, number>;
+};
+
+type EaFile = { fetchedAt: string; players: Record<string, EaRating> };
+
+const MIN_APPEARANCES = 3;
+const MIN_MINUTES = 270;
+const FIRST_TEAM_APPEARANCES = 7;
+const CORE_SIZE = 10;
+
+let eaCache: EaFile | null = null;
+function getEa(): EaFile {
+  if (!eaCache) {
+    eaCache = JSON.parse(fs.readFileSync(path.join(process.cwd(), "data", "ea-ratings.json"), "utf8")) as EaFile;
+  }
+  return eaCache;
+}
+
 export function getGameData(): GameData {
   const { meta, teams, players } = getIndex();
-  const teamName = new Map(teams.map((team) => [team.id, team]));
+  const ea = getEa();
+  const teamName = new Map(teams.map((team) => [team.id, team.name]));
   const rollPlayers: RollPlayer[] = [];
 
   for (const player of players) {
     if (player.teamConflict || (player.position !== "D" && player.position !== "M" && player.position !== "F")) continue;
-    const featured = new Map(player.featured.map((stat) => [stat.key, stat]));
+    if (player.appearances < MIN_APPEARANCES || player.minutes < MIN_MINUTES) continue;
+    const rating = ea.players[String(player.id)];
+    if (!rating) continue;
     const stats: RollStat[] = [];
-    let complete = true;
     for (const definition of BUILD_STATS) {
-      const stat = featured.get(definition.key);
-      if (!stat?.eligible || stat.percentile == null || stat.value == null) {
-        complete = false;
-        break;
-      }
-      stats.push({
-        key: definition.key,
-        label: definition.label,
-        group: definition.group,
-        percentile: stat.percentile,
-        value: stat.value,
-        unit: stat.unit,
-      });
+      const value = rating.stats[definition.key];
+      if (typeof value !== "number") break;
+      stats.push({ key: definition.key, label: definition.label, detail: definition.detail, value });
     }
-    if (!complete || !player.position) continue;
-    const average = stats.reduce((sum, stat) => sum + stat.percentile, 0) / stats.length;
+    if (stats.length !== BUILD_STATS.length) continue;
     rollPlayers.push({
       id: player.id,
       name: player.name,
       position: player.position,
-      positionInfo: player.positionInfo,
+      eaPosition: rating.position,
+      overall: rating.overall,
+      avatarUrl: rating.avatarUrl,
       teamId: player.teamId,
-      teamName: teamName.get(player.teamId)?.name ?? "Unknown",
+      teamName: teamName.get(player.teamId) ?? "Unknown",
       minutes: player.minutes,
       appearances: player.appearances,
       goals: player.goals,
       assists: player.assists,
-      role: player.appearances >= 8 ? "First team" : "Bench",
-      average: Math.round(average * 10) / 10,
+      role: player.appearances >= FIRST_TEAM_APPEARANCES ? "First team" : "Bench",
       stats,
     });
   }
 
   const clubs: ClubRating[] = teams.map((team) => {
     const squad = rollPlayers.filter((player) => player.teamId === team.id);
-    const profiles = squad.map((player) => strengthFrom(player.stats));
-    const attack = profiles.length ? profiles.reduce((sum, profile) => sum + profile.attack, 0) / profiles.length : 50;
-    const defense = profiles.length ? profiles.reduce((sum, profile) => sum + profile.defense, 0) / profiles.length : 50;
-    return {
-      id: team.id,
-      name: team.name,
-      abbr: team.abbr,
-      squad: squad.length,
-      attack,
-      defense,
-    };
+    const core = [...squad]
+      .sort((a, b) => b.minutes - a.minutes)
+      .slice(0, CORE_SIZE)
+      .map((player) => ({ id: player.id, overall: player.overall, ...strengthFrom(player.stats) }));
+    const mean = (key: "attack" | "defense") => (core.length ? core.reduce((sum, player) => sum + player[key], 0) / core.length : 70);
+    return { id: team.id, name: team.name, abbr: team.abbr, squad: squad.length, core, attack: mean("attack"), defense: mean("defense") };
   });
 
   const recordedMatches = 10;
@@ -72,5 +85,7 @@ export function getGameData(): GameData {
     firstTeam: rollPlayers.filter((player) => player.role === "First team").length,
     bench: rollPlayers.filter((player) => player.role === "Bench").length,
     recordedMatches,
+    coreSize: CORE_SIZE,
+    eaFetchedAt: ea.fetchedAt,
   };
 }
