@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getIndex } from "@/lib/data";
-import { BUILD_STATS, strengthFrom, type ClubRating, type GameData, type RollPlayer, type RollStat } from "@/lib/ratings";
+import { getIndex, getPlayer } from "@/lib/data";
+import { BUILD_STATS, FORM_WEIGHT, FULL_FORM_MINUTES, strengthFrom, type BuildStatKey, type ClubRating, type GameData, type RollPlayer, type RollStat } from "@/lib/ratings";
 
 export type { ClubRating, GameData, RollPlayer, RollStat };
 
@@ -29,30 +29,86 @@ function getEa(): EaFile {
   return eaCache;
 }
 
+type Candidate = {
+  player: ReturnType<typeof getIndex>["players"][number];
+  rating: EaRating;
+  percentile: Partial<Record<BuildStatKey, number>>;
+};
+
+/** Mean percentile of the eligible season measures behind one stat, or undefined when none were published. */
+function formPercentile(rates: Map<string, number>, keys: readonly string[]) {
+  const values = keys.map((key) => rates.get(key)).filter((value): value is number => typeof value === "number");
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : undefined;
+}
+
+/**
+ * Converts a season percentile into a rating by reading the EA value at the same rank in the roll pool,
+ * so a player in the league's 80th percentile for take-ons gets what an 80th-percentile EA dribbler has.
+ */
+function quantile(sorted: number[], percentile: number) {
+  const index = Math.round((percentile / 100) * (sorted.length - 1));
+  return sorted[Math.min(sorted.length - 1, Math.max(0, index))];
+}
+
+let gameCache: GameData | null = null;
+
 export function getGameData(): GameData {
+  if (gameCache) return gameCache;
   const { meta, teams, players } = getIndex();
   const ea = getEa();
   const teamName = new Map(teams.map((team) => [team.id, team.name]));
-  const rollPlayers: RollPlayer[] = [];
 
+  const candidates: Candidate[] = [];
   for (const player of players) {
     if (player.teamConflict || (player.position !== "D" && player.position !== "M" && player.position !== "F")) continue;
     if (player.appearances < MIN_APPEARANCES || player.minutes < MIN_MINUTES) continue;
     const rating = ea.players[String(player.id)];
-    if (!rating) continue;
-    const stats: RollStat[] = [];
-    for (const definition of BUILD_STATS) {
-      const value = rating.stats[definition.key];
-      if (typeof value !== "number") break;
-      stats.push({ key: definition.key, label: definition.label, detail: definition.detail, value });
+    if (!rating || BUILD_STATS.some((definition) => typeof rating.stats[definition.key] !== "number")) continue;
+    const detail = getPlayer(String(player.id));
+    const rates = new Map<string, number>();
+    for (const rate of [...(detail?.featured ?? []), ...(detail?.supporting ?? [])]) {
+      if (rate.eligible && typeof rate.percentile === "number") rates.set(rate.key, rate.percentile);
     }
-    if (stats.length !== BUILD_STATS.length) continue;
-    rollPlayers.push({
+    const percentile: Candidate["percentile"] = {};
+    for (const definition of BUILD_STATS) {
+      const value = formPercentile(rates, definition.form);
+      if (value !== undefined) percentile[definition.key] = value;
+    }
+    candidates.push({ player, rating, percentile });
+  }
+
+  const eaSorted = new Map(BUILD_STATS.map((definition) => [definition.key, candidates.map((item) => item.rating.stats[definition.key]).sort((a, b) => a - b)]));
+
+  // Averaging several percentiles pulls everyone toward the middle, so the averages are re-ranked within the pool.
+  for (const definition of BUILD_STATS) {
+    const scored = candidates.filter((item) => item.percentile[definition.key] !== undefined);
+    const sorted = scored.map((item) => item.percentile[definition.key]!).sort((a, b) => a - b);
+    for (const item of scored) {
+      const value = item.percentile[definition.key]!;
+      const below = sorted.findIndex((entry) => entry >= value);
+      const through = sorted.findLastIndex((entry) => entry <= value);
+      item.percentile[definition.key] = sorted.length > 1 ? (((below + through) / 2) / (sorted.length - 1)) * 100 : 50;
+    }
+  }
+
+  const rollPlayers: RollPlayer[] = candidates.map(({ player, rating, percentile }) => {
+    const weight = FORM_WEIGHT * Math.min(1, player.minutes / FULL_FORM_MINUTES);
+    const stats: RollStat[] = BUILD_STATS.map((definition) => {
+      const eaValue = rating.stats[definition.key];
+      const rank = percentile[definition.key];
+      const form = rank === undefined ? null : quantile(eaSorted.get(definition.key)!, rank);
+      const value = form === null ? eaValue : Math.round((1 - weight) * eaValue + weight * form);
+      return { key: definition.key, label: definition.label, detail: definition.detail, value, ea: eaValue, form };
+    });
+    const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
+    return {
       id: player.id,
       name: player.name,
-      position: player.position,
+      position: player.position ?? "",
       eaPosition: rating.position,
-      overall: rating.overall,
+      overall: rating.overall + formDelta,
+      eaOverall: rating.overall,
+      formDelta,
       avatarUrl: rating.avatarUrl,
       teamId: player.teamId,
       teamName: teamName.get(player.teamId) ?? "Unknown",
@@ -62,8 +118,8 @@ export function getGameData(): GameData {
       assists: player.assists,
       role: player.appearances >= FIRST_TEAM_APPEARANCES ? "First team" : "Bench",
       stats,
-    });
-  }
+    };
+  });
 
   const clubs: ClubRating[] = teams.map((team) => {
     const squad = rollPlayers.filter((player) => player.teamId === team.id);
@@ -77,7 +133,7 @@ export function getGameData(): GameData {
 
   const recordedMatches = 10;
   const goals = players.reduce((sum, player) => sum + player.goals, 0);
-  return {
+  gameCache = {
     season: meta.season,
     players: rollPlayers,
     clubs,
@@ -88,4 +144,5 @@ export function getGameData(): GameData {
     coreSize: CORE_SIZE,
     eaFetchedAt: ea.fetchedAt,
   };
+  return gameCache;
 }

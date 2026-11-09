@@ -30,7 +30,7 @@ export type DoneQuest = { id: string; at: number; banked: boolean };
 const countWhere = (test: (pick: PickRecord) => boolean) => (picks: PickRecord[]) => picks.filter(test).length;
 
 export const QUESTS: QuestDef[] = [
-  { id: "world", title: "World class", detail: "Lock any stat rated 90+", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.value >= 90) },
+  { id: "world", title: "Top drawer", detail: "Lock any stat rated 88+", target: 1, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.value >= 88) },
   { id: "bench", title: "Off the bench", detail: "Take a stat from a bench player", target: 1, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.role === "Bench") },
   { id: "backline", title: "Built from the back", detail: "Take 2 stats from defenders", target: 2, reward: { team: 1, player: 0 }, count: countWhere((pick) => pick.position === "D") },
   { id: "engine", title: "Engine room", detail: "Take 2 stats from midfielders", target: 2, reward: { team: 0, player: 1 }, count: countWhere((pick) => pick.position === "M") },
