@@ -1,5 +1,50 @@
 import type { BuildStatKey } from "@/lib/ratings";
 import type { PickRecord } from "@/lib/quests";
+import type { RollPlayer } from "@/lib/ratings";
+
+export type ChemTrackId =
+  | "teammates"
+  | "nation"
+  | "club-country"
+  | "back-line"
+  | "engine"
+  | "front-line"
+  | "primes"
+  | "spine"
+  | "squad-depth";
+
+export type ChemTrack = {
+  id: ChemTrackId;
+  label: string;
+  target: number;
+  boost: number;
+  keys: BuildStatKey[] | "all";
+  /** How many unique matching players are already in the build. */
+  count: (players: ChemPlayer[]) => number;
+  /** Whether the rolled player belongs on this track. */
+  includes: (player: ChemPlayer) => boolean;
+  color: string;
+};
+
+export type ChemPlayer = {
+  playerId: number;
+  teamId: number;
+  teamName: string;
+  nationality: string | null;
+  position: string;
+  role: "First team" | "Bench";
+  prime?: boolean;
+};
+
+export type ChemHint = {
+  id: ChemTrackId;
+  label: string;
+  current: number;
+  target: number;
+  boost: number;
+  complete: boolean;
+  color: string;
+};
 
 export type ChemLink = {
   id: string;
@@ -7,161 +52,266 @@ export type ChemLink = {
   detail: string;
   boost: number;
   keys: BuildStatKey[] | "all";
-  /** Player ids that trigger the link; only their matching locked stats receive the boost. */
   playerIds: number[];
+  current: number;
+  target: number;
+  color: string;
 };
 
 const DEF_KEYS: BuildStatKey[] = ["def", "phy", "reactions", "headingAccuracy"];
 const MID_KEYS: BuildStatKey[] = ["pas", "dri", "vision", "pac"];
 const FWD_KEYS: BuildStatKey[] = ["sho", "finishing", "pac", "dri"];
 
-function groupBy<T>(items: T[], key: (item: T) => string | number) {
-  const map = new Map<string | number, T[]>();
-  for (const item of items) {
-    const group = key(item);
-    map.set(group, [...(map.get(group) ?? []), item]);
+function uniquePlayers(picks: PickRecord[]): ChemPlayer[] {
+  const seen = new Map<number, ChemPlayer>();
+  for (const pick of picks) {
+    if (seen.has(pick.playerId)) continue;
+    seen.set(pick.playerId, {
+      playerId: pick.playerId,
+      teamId: pick.teamId,
+      teamName: pick.teamName,
+      nationality: pick.nationality,
+      position: pick.position,
+      role: pick.role,
+      prime: pick.prime,
+    });
   }
-  return map;
-}
-
-function uniquePlayers(picks: PickRecord[]) {
-  const seen = new Map<number, PickRecord>();
-  for (const pick of picks) if (!seen.has(pick.playerId)) seen.set(pick.playerId, pick);
   return [...seen.values()];
 }
 
-/**
- * Chemistry is built only from published facts we already store: current club,
- * nationality, position, role, and whether a roll arrived as prime.
- * There is no invented "played together in 2019" history.
- */
-export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
-  if (picks.length < 2) return [];
-  const links: ChemLink[] = [];
-  const players = uniquePlayers(picks);
+function asChemPlayer(player: RollPlayer): ChemPlayer {
+  return {
+    playerId: player.id,
+    teamId: player.teamId,
+    teamName: player.teamName,
+    nationality: player.nationality,
+    position: player.position,
+    role: player.role,
+    prime: player.prime,
+  };
+}
 
-  for (const [teamId, group] of groupBy(players, (pick) => pick.teamId)) {
-    if (group.length < 2) continue;
-    const ids = group.map((pick) => pick.playerId);
-    const club = group[0].teamName;
-    if (group.length >= 4) {
-      links.push({ id: `club4-${teamId}`, title: "Dressing room", detail: `4 ${club} players in the build`, boost: 3, keys: "all", playerIds: ids });
-    } else if (group.length >= 3) {
-      links.push({ id: `club3-${teamId}`, title: "Clubmates", detail: `3 ${club} players in the build`, boost: 2, keys: "all", playerIds: ids });
-    } else {
-      links.push({ id: `club2-${teamId}`, title: "Teammates", detail: `2 ${club} players in the build`, boost: 1, keys: "all", playerIds: ids });
-    }
-  }
-
-  for (const [nation, group] of groupBy(
-    players.filter((pick) => pick.nationality),
-    (pick) => pick.nationality!,
-  )) {
-    if (group.length < 2) continue;
-    const ids = group.map((pick) => pick.playerId);
-    if (group.length >= 3) {
-      links.push({ id: `nat3-${nation}`, title: "International", detail: `3 ${nation} players in the build`, boost: 2, keys: "all", playerIds: ids });
-    } else {
-      links.push({ id: `nat2-${nation}`, title: "Same passport", detail: `2 ${nation} players in the build`, boost: 1, keys: "all", playerIds: ids });
-    }
-  }
-
-  // Club + country: two players who share both team and nationality.
-  for (const [teamId, clubGroup] of groupBy(players, (pick) => pick.teamId)) {
-    for (const [nation, nationGroup] of groupBy(
-      clubGroup.filter((pick) => pick.nationality),
-      (pick) => pick.nationality!,
-    )) {
-      if (nationGroup.length < 2) continue;
-      links.push({
-        id: `clubnat-${teamId}-${nation}`,
-        title: "Club & country",
-        detail: `2 ${nationGroup[0].teamName} / ${nation} teammates`,
-        boost: 2,
-        keys: "all",
-        playerIds: nationGroup.map((pick) => pick.playerId),
-      });
-    }
-  }
-
-  const defenders = players.filter((pick) => pick.position === "D");
-  if (defenders.length >= 2) {
-    links.push({
-      id: "backline",
-      title: "Back line",
-      detail: `${defenders.length} defenders stitching the defence`,
-      boost: defenders.length >= 3 ? 2 : 1,
-      keys: DEF_KEYS,
-      playerIds: defenders.map((pick) => pick.playerId),
-    });
-  }
-
-  const mids = players.filter((pick) => pick.position === "M");
-  if (mids.length >= 2) {
-    links.push({
-      id: "engine",
-      title: "Engine room",
-      detail: `${mids.length} midfielders linking the play`,
-      boost: mids.length >= 3 ? 2 : 1,
-      keys: MID_KEYS,
-      playerIds: mids.map((pick) => pick.playerId),
-    });
-  }
-
-  const forwards = players.filter((pick) => pick.position === "F");
-  if (forwards.length >= 2) {
-    links.push({
-      id: "frontline",
-      title: "Front line",
-      detail: `${forwards.length} attackers in the mix`,
-      boost: forwards.length >= 3 ? 2 : 1,
-      keys: FWD_KEYS,
-      playerIds: forwards.map((pick) => pick.playerId),
-    });
-  }
-
-  const hasFirst = players.some((pick) => pick.role === "First team");
-  const hasBench = players.some((pick) => pick.role === "Bench");
-  if (hasFirst && hasBench) {
-    links.push({
-      id: "squad-depth",
-      title: "Squad depth",
-      detail: "First-team and bench parts in the same build",
-      boost: 1,
-      keys: ["reactions", "phy"],
-      playerIds: players.map((pick) => pick.playerId),
-    });
-  }
-
-  const primes = players.filter((pick) => pick.prime);
-  if (primes.length >= 2) {
-    links.push({
-      id: "prime-duo",
-      title: "Prime partnership",
-      detail: `${primes.length} prime rolls in the build`,
+/** Fixed chemistry tracks with clear targets, shown as teammates 1/3 style bars. */
+export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
+  return [
+    {
+      id: "teammates",
+      label: "teammates",
+      target: 3,
       boost: 2,
       keys: "all",
-      playerIds: primes.map((pick) => pick.playerId),
-    });
-  }
-
-  // Spine: at least one defender, midfielder and forward.
-  const positions = new Set(players.map((pick) => pick.position));
-  if (positions.has("D") && positions.has("M") && positions.has("F")) {
-    links.push({
+      color: "bg-grass",
+      count: (players) => players.filter((item) => item.teamId === player.teamId).length,
+      includes: (item) => item.teamId === player.teamId,
+    },
+    // Note: label stays "teammates" on tiles as the hint; completed links can name the club in detail.
+    {
+      id: "nation",
+      label: player.nationality ? player.nationality.toLowerCase() : "nation",
+      target: 3,
+      boost: 2,
+      keys: "all",
+      color: "bg-flood",
+      count: (players) => players.filter((item) => item.nationality && item.nationality === player.nationality).length,
+      includes: (item) => Boolean(player.nationality && item.nationality === player.nationality),
+    },
+    {
+      id: "club-country",
+      label: "club & country",
+      target: 2,
+      boost: 2,
+      keys: "all",
+      color: "bg-gold",
+      count: (players) =>
+        players.filter((item) => item.teamId === player.teamId && item.nationality && item.nationality === player.nationality).length,
+      includes: (item) => item.teamId === player.teamId && Boolean(player.nationality && item.nationality === player.nationality),
+    },
+    {
+      id: "back-line",
+      label: "back line",
+      target: 3,
+      boost: 2,
+      keys: DEF_KEYS,
+      color: "bg-flood",
+      count: (players) => players.filter((item) => item.position === "D").length,
+      includes: (item) => item.position === "D",
+    },
+    {
+      id: "engine",
+      label: "engine",
+      target: 3,
+      boost: 2,
+      keys: MID_KEYS,
+      color: "bg-grass",
+      count: (players) => players.filter((item) => item.position === "M").length,
+      includes: (item) => item.position === "M",
+    },
+    {
+      id: "front-line",
+      label: "front line",
+      target: 3,
+      boost: 2,
+      keys: FWD_KEYS,
+      color: "bg-kit",
+      count: (players) => players.filter((item) => item.position === "F").length,
+      includes: (item) => item.position === "F",
+    },
+    {
+      id: "primes",
+      label: "primes",
+      target: 2,
+      boost: 2,
+      keys: "all",
+      color: "bg-kit",
+      count: (players) => players.filter((item) => item.prime).length,
+      includes: (item) => Boolean(item.prime),
+    },
+    {
+      id: "squad-depth",
+      label: "squad",
+      target: 2,
+      boost: 1,
+      keys: ["reactions", "phy"],
+      color: "bg-gold",
+      count: (players) => {
+        const first = players.some((item) => item.role === "First team");
+        const bench = players.some((item) => item.role === "Bench");
+        return (first ? 1 : 0) + (bench ? 1 : 0);
+      },
+      includes: () => true,
+    },
+    {
       id: "spine",
-      title: "Full spine",
-      detail: "Defender, midfielder and forward all contribute",
+      label: "spine",
+      target: 3,
       boost: 1,
       keys: "all",
-      playerIds: players.map((pick) => pick.playerId),
-    });
+      color: "bg-grass",
+      count: (players) => new Set(players.map((item) => item.position).filter((position) => position === "D" || position === "M" || position === "F")).size,
+      includes: (item) => item.position === "D" || item.position === "M" || item.position === "F",
+    },
+  ];
+}
+
+function trackProgress(track: ChemTrack, players: ChemPlayer[]): ChemHint {
+  const current = Math.min(track.target, track.count(players));
+  return {
+    id: track.id,
+    label: track.label,
+    current,
+    target: track.target,
+    boost: track.boost,
+    complete: current >= track.target,
+    color: track.color,
+  };
+}
+
+/** Active / completed chemistry for the build panel. */
+export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
+  const players = uniquePlayers(picks);
+  if (!players.length) return [];
+  const seen = new Set<string>();
+  const links: ChemLink[] = [];
+
+  for (const player of players) {
+    for (const track of chemTracksFor(player)) {
+      const key =
+        track.id === "teammates"
+          ? `teammates-${player.teamId}`
+          : track.id === "nation"
+            ? `nation-${player.nationality}`
+            : track.id === "club-country"
+              ? `club-country-${player.teamId}-${player.nationality}`
+              : track.id;
+      if (seen.has(key)) continue;
+      const hint = trackProgress(track, players);
+      const minShow = track.id === "spine" || track.id === "squad-depth" ? track.target : 2;
+      if (hint.current < minShow) continue;
+      const memberIds = players.filter((item) => track.includes(item)).map((item) => item.playerId);
+      if (memberIds.length < 2 && track.id !== "spine" && track.id !== "squad-depth") continue;
+      seen.add(key);
+      const title =
+        track.id === "teammates"
+          ? `teammates · ${player.teamName.split(" ").slice(-1)[0]?.toLowerCase()}`
+          : track.id === "nation"
+            ? (player.nationality ?? "nation").toLowerCase()
+            : track.label;
+      links.push({
+        id: key,
+        title,
+        detail: `${hint.current}/${hint.target}`,
+        boost: hint.complete ? track.boost : Math.max(1, Math.floor(track.boost / 2)),
+        keys: track.keys,
+        playerIds: memberIds,
+        current: hint.current,
+        target: track.target,
+        color: track.color,
+      });
+    }
   }
 
   return links;
 }
 
-/** Per locked stat key, total chemistry points (capped). Stacking links add up, then clamp. */
+/** Tracks that belong on attribute tiles — clubmates / nation / lines, not meta spine/squad. */
+const TILE_TRACKS = new Set<ChemTrackId>([
+  "teammates",
+  "nation",
+  "club-country",
+  "back-line",
+  "engine",
+  "front-line",
+  "primes",
+]);
+
+/**
+ * Progress bars for the rolled player's attribute tiles.
+ * Prefers the closest unfinished track that this player advances.
+ */
+export function tileChemHint(rolled: RollPlayer, picks: PickRecord[], statKey: BuildStatKey): ChemHint | null {
+  const players = uniquePlayers(picks);
+  const candidate = asChemPlayer(rolled);
+  // Progress is how many matching players are already locked. Bars appear once a set has started,
+  // and only on tiles that would keep building that set (Roblox-style teammates 1/3).
+  const hints = chemTracksFor(candidate)
+    .filter((track) => TILE_TRACKS.has(track.id))
+    .filter((track) => track.includes(candidate))
+    .filter((track) => track.keys === "all" || track.keys.includes(statKey))
+    .map((track) => trackProgress(track, players))
+    .filter((hint) => hint.current > 0);
+
+  if (!hints.length) return null;
+  const prefer = (id: ChemTrackId) =>
+    id === "teammates" ? 0 : id === "nation" ? 1 : id === "club-country" ? 2 : id === "primes" ? 3 : 4;
+  hints.sort((a, b) => {
+    if (a.complete !== b.complete) return a.complete ? 1 : -1;
+    if (prefer(a.id) !== prefer(b.id)) return prefer(a.id) - prefer(b.id);
+    return b.current / b.target - a.current / a.target || b.current - a.current;
+  });
+  return hints[0];
+}
+
+/** Tracks already started that this rolled player can keep filling. */
+export function rolledChemHints(rolled: RollPlayer, picks: PickRecord[]): ChemHint[] {
+  const players = uniquePlayers(picks);
+  const candidate = asChemPlayer(rolled);
+  const seen = new Set<string>();
+  const hints: ChemHint[] = [];
+  for (const track of chemTracksFor(candidate)) {
+    if (!TILE_TRACKS.has(track.id)) continue;
+    if (!track.includes(candidate) || seen.has(track.id)) continue;
+    seen.add(track.id);
+    const hint = trackProgress(track, players);
+    if (hint.current <= 0) continue;
+    hints.push(hint);
+  }
+  return hints.sort((a, b) => {
+    const prefer = (id: ChemTrackId) =>
+      id === "teammates" ? 0 : id === "nation" ? 1 : id === "club-country" ? 2 : id === "primes" ? 3 : 4;
+    return prefer(a.id) - prefer(b.id) || b.current / b.target - a.current / a.target;
+  });
+}
+
 export function chemistryBoosts(picks: PickRecord[], links = evaluateChemistry(picks)) {
   const boosts = new Map<string, number>();
   for (const pick of picks) {
