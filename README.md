@@ -14,8 +14,6 @@ About 12% of rolls arrive in their **prime**: each stat takes the better of EA a
 
 Chemistry boosts locked stats when the build shares real links: current clubmates, same nationality, club-and-country pairs, back/mid/front lines, first-team plus bench, two primes, or a full D-M-F spine. Attribute tiles show progress bars like `teammates 1/3` or `back line 2/3` once a set has started — a hint that picking this player keeps filling that link. The right panel lists completed sets. Boosts stack up to +4 on a single attribute and feed the season rating.
 
-The draft board is a three-column table: left is the rolled player, center is the attribute pick with team/player rerolls, right is your build and chemistry.
-
 Three quests are open at a time, and each pays out extra team or player rerolls (for example, take a stat from a bench player, or make 3 picks in a row without rerolling). When one is done, the next quest in the queue takes its place. A quest finished on the tenth pick banks its reward for the next run. Finishing top seven also banks bonus rerolls: champions +2 team and +2 player, top four +1 of each, and top seven +1 player. This bonus is paid once per build.
 
 After ten picks you roll the club you join, and all 38 matchweeks are simulated. At full time you choose New run (a fresh build with any banked rerolls), Run it back (same build and club), or New club (same build, a new club roll). The keys are N, R and C. Each club is rated from the blended ratings of its 10 most-used outfielders, and you replace the lowest-rated of them. A match turns attack against defence into expected goals at this season’s scoring rate, and the score is drawn at random. It is a simulation, not a forecast.

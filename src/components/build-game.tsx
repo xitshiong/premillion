@@ -43,6 +43,19 @@ const ROUND_LINES = [
   "last pull. make it count.",
 ];
 
+const SHORT_LABEL: Record<string, string> = {
+  pac: "PAC",
+  sho: "SHO",
+  pas: "PAS",
+  dri: "DRI",
+  def: "DEF",
+  phy: "PHY",
+  finishing: "FIN",
+  vision: "VIS",
+  reactions: "REA",
+  headingAccuracy: "HEA",
+};
+
 type Spin = { kind: "team" | "player" | "club"; title: string; subtitle: string };
 type Phase = "intro" | "build" | "season";
 type QuestState = { active: ActiveQuest[]; queue: string[]; done: DoneQuest[] };
@@ -848,104 +861,112 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     );
   }
 
-  const teamRerollButton = (compact: boolean) => (
-    <button
-      type="button"
-      onClick={rerollTeam}
-      disabled={spinning || teamRerolls <= 0}
-      className={`glow-flood flex h-full w-full items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2.5 text-[11px]"}`}
-      title="New club and a new player from it"
-    >
-      {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-xl leading-none text-flood">{teamRerolls}</span>
-      {compact ? null : <Key>T</Key>}
-    </button>
-  );
-  const playerRerollButton = (compact: boolean) => (
-    <button
-      type="button"
-      onClick={rerollPlayer}
-      disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
-      className={`glow-kit flex h-full w-full items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2.5 text-[11px]"}`}
-      title={`Another ${rolled.teamName} player`}
-    >
-      {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-xl leading-none text-kit">{playerRerolls}</span>
-      {compact ? null : <Key>Y</Key>}
-    </button>
+  const rerollButtons = (compact: boolean) => (
+    <>
+      <button
+        type="button"
+        onClick={rerollTeam}
+        disabled={spinning || teamRerolls <= 0}
+        className={`glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        title="New club and a new player from it"
+      >
+        {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-xl leading-none text-flood">{teamRerolls}</span>
+        {compact ? null : <Key>T</Key>}
+      </button>
+      <button
+        type="button"
+        onClick={rerollPlayer}
+        disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
+        className={`glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        title={`Another ${rolled.teamName} player`}
+      >
+        {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-xl leading-none text-kit">{playerRerolls}</span>
+        {compact ? null : <Key>Y</Key>}
+      </button>
+    </>
   );
 
+  const latestDone = quests.done[quests.done.length - 1];
   const rollHints = !complete && !rollSpin ? rolledChemHints(rolled, lockedStats) : [];
 
   return (
-    <div className="crt min-h-screen bg-night font-ui text-chalk">
+    <div className="crt min-h-screen bg-night pb-24 font-ui text-chalk lg:pb-0">
       {header}
       {toastNode}
+      <div className="relative hidden sm:block">
+        <PixelStadium className="h-20 opacity-90 lg:h-24" />
+        <p className="absolute inset-x-0 bottom-2.5 text-center text-xs text-chalk/80">── {complete ? "ten pulls done. one footballer. allegedly." : ROUND_LINES[taken]}</p>
+      </div>
 
-      {/* Draft table: left = rolled player, center = picks, right = build + chemistry */}
-      <div className="mx-auto grid max-w-[1320px] gap-2 px-2 py-2 pb-24 sm:gap-3 sm:px-3 sm:py-3 lg:grid-cols-[240px_minmax(0,1fr)_260px] lg:pb-3 xl:grid-cols-[260px_minmax(0,1fr)_280px]">
-        {/* LEFT — what you rolled */}
-        <aside className="pixel-frame order-1 flex flex-col bg-turf lg:order-none">
-          <p className="border-b border-line px-3 py-1.5 font-pixel text-[9px] tracking-[0.28em] text-haze">ON THE TABLE</p>
-          <div key={rollSpin ? "spin" : `card-${rollCount}`} className={rollSpin ? "" : "animate-card-pop"}>
-            <div className="relative aspect-[4/3.1] overflow-hidden bg-[linear-gradient(180deg,#163828_0%,#0c1f16_100%)]">
-              {rollSpin ? (
-                <div className="absolute inset-0 grid place-items-center">
-                  <div className="animate-roll-glow absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(240,193,74,0.28),transparent_60%)]" />
-                  <p className="relative font-pixel text-6xl text-flood">?</p>
-                </div>
-              ) : (
-                <>
-                  <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
-                  <div className="absolute top-2 right-2 border border-line bg-night/90 px-2 py-1 text-center">
-                    <p className="font-pixel text-[8px] tracking-widest text-haze">OVR</p>
-                    <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
-                    <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
+      <div className="mx-auto grid max-w-[1320px] 2xl:max-w-[1560px] gap-3 px-3 py-3 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:px-5 xl:grid-cols-[320px_minmax(0,1fr)_320px] 2xl:grid-cols-[360px_minmax(0,1fr)_360px]">
+        <div className="contents lg:flex lg:flex-col lg:gap-3">
+          <section className="pixel-frame order-1 bg-turf lg:order-none">
+            <p className="hidden border-b border-line px-4 py-2 font-pixel text-[11px] tracking-[0.3em] text-haze lg:block">YOU ROLLED</p>
+            <div key={rollSpin ? "spin" : `card-${rollCount}`} className={`flex gap-3 p-3 lg:block lg:p-0 ${rollSpin ? "" : "animate-card-pop"}`}>
+              <div className="relative size-28 shrink-0 overflow-hidden border border-line bg-[linear-gradient(180deg,#14284a_0%,#0b1424_100%)] sm:size-36 lg:mx-3 lg:mt-3 lg:aspect-[4/3.4] lg:size-auto">
+                {rollSpin ? (
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="animate-roll-glow absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(94,230,255,0.32),transparent_60%)]" />
+                    <p className="relative font-pixel text-4xl text-flood lg:text-6xl">?</p>
                   </div>
-                  <span className={`absolute top-2 left-2 px-1.5 py-0.5 font-pixel text-[9px] tracking-widest ${rolled.prime ? "bg-kit text-night" : rolled.role === "First team" ? "bg-gold text-night" : "bg-grass text-night"}`}>
-                    {rolled.prime ? "PRIME" : rolled.role === "First team" ? "STARTER" : "SQUAD"}
-                  </span>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Portrait key={rolled.id} url={rolled.avatarUrl} name={rolled.name} />
+                    <div className="absolute top-2 right-2 hidden border border-line bg-night/85 px-2 py-1 text-center lg:block">
+                      <p className="font-pixel text-[9px] tracking-widest text-haze">OVR</p>
+                      <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
+                      <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
+                    </div>
+                    <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 font-pixel text-[8px] tracking-widest lg:top-2 lg:left-2 lg:text-[9px] ${rolled.prime ? "bg-kit text-night" : rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}>
+                      {rolled.prime ? "PRIME" : rolled.role.toUpperCase()}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 self-center lg:px-4 lg:pt-3 lg:pb-4">
+                <h1 className={`font-digits text-3xl leading-none uppercase sm:text-4xl ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>{rollSpin ? rollSpin.title : rolled.name}</h1>
+                <p className="mt-1.5 truncate font-pixel text-[10px] tracking-[0.2em] text-kit sm:text-[11px]">{(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}</p>
+                {!rollSpin ? (
+                  <>
+                    <p className="mt-2 flex flex-wrap items-center gap-2 lg:hidden">
+                      <span className={`font-digits text-3xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</span>
+                      <span className="font-pixel text-[9px] tracking-widest text-haze">OVR · {rolled.eaPosition}</span>
+                      {rolled.prime ? <span className="bg-kit px-1.5 py-0.5 font-pixel text-[8px] tracking-widest text-night">PRIME</span> : null}
+                    </p>
+                    <p className="mt-2 text-[11px] text-haze lg:mt-3">
+                      {rolled.nationality ?? "—"} · {rolled.appearances} apps · {rolled.minutes}&apos; · {rolled.goals}g · {rolled.assists}a · EA {rolled.eaOverall}
+                      {rolled.formDelta ? ` · form ${rolled.formDelta > 0 ? "+" : ""}${rolled.formDelta}` : ""}
+                    </p>
+                    {rollHints.length ? (
+                      <div className="mt-2 space-y-1">
+                        {rollHints.slice(0, 3).map((hint) => (
+                          <ChemBar key={hint.id} hint={hint} compact />
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
             </div>
-            <div className="px-3 py-3">
-              <h1 className={`font-digits text-[1.85rem] leading-none uppercase xl:text-4xl ${rollSpin ? "animate-ticker text-flood" : "text-chalk"}`}>
-                {rollSpin ? rollSpin.title : rolled.name}
-              </h1>
-              <p className="mt-1 truncate font-pixel text-[11px] tracking-[0.16em] text-kit">
-                {(rollSpin ? rollSpin.subtitle : rolled.teamName).toUpperCase()}
-              </p>
-              {!rollSpin ? (
-                <p className="mt-2 font-pixel text-[10px] tracking-[0.08em] text-haze">
-                  {(rolled.nationality ?? "—").toUpperCase()} · {rolled.appearances} APPS · {rolled.goals}G {rolled.assists}A
-                </p>
-              ) : null}
-              {rollHints.length ? (
-                <div className="mt-3 space-y-1">
-                  {rollHints.slice(0, 3).map((hint) => (
-                    <ChemBar key={hint.id} hint={hint} compact />
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-[10px] leading-snug text-dim">lock clubmates or a back line and these bars light up on every attribute.</p>
-              )}
-            </div>
-          </div>
+          </section>
 
-          <div className="mt-auto border-t border-line px-3 py-2">
-            <div className="mb-1 flex items-baseline justify-between">
-              <p className="font-pixel text-[9px] tracking-[0.28em] text-gold">QUESTS</p>
-              <p className="text-[10px] text-dim">{quests.done.length} done</p>
+          <section className="pixel-frame order-3 bg-turf p-3 lg:order-none">
+            <div className="flex items-baseline justify-between gap-2 px-0.5">
+              <p className="font-pixel text-[11px] tracking-[0.3em] text-gold">QUESTS</p>
+              <p className="text-[10px] text-dim">{quests.done.length} done · rewards are rerolls</p>
             </div>
-            <div className="space-y-1">
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-1">
               {quests.active.map((active) => {
                 const quest = questById(active.id);
                 const progress = complete ? 0 : questProgress(active, lockedStats, lastRerollAt);
                 return (
-                  <div key={`${active.id}-${active.since}`} className={`px-0 py-1 ${complete ? "opacity-45" : ""}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate font-pixel text-[10px] tracking-[0.06em] text-chalk">{quest.title.toUpperCase()}</p>
+                  <div key={`${active.id}-${active.since}`} className={`border px-2.5 py-2 ${complete ? "border-line/60 opacity-50" : "animate-tile-in border-line bg-stand"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-pixel text-[10px] tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
                       <RewardChip reward={quest.reward} muted={complete} />
                     </div>
-                    <div className="mt-1 flex gap-0.5">
+                    <p className="mt-0.5 text-[10px] leading-snug text-haze">{quest.detail.toLowerCase()}</p>
+                    <div className="mt-1.5 flex gap-0.5">
                       {Array.from({ length: quest.target }, (_, index) => (
                         <span key={index} className={`h-1 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
                       ))}
@@ -954,27 +975,53 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 );
               })}
             </div>
-          </div>
-        </aside>
+            {quests.done.length ? (
+              <ul className="mt-2 space-y-1">
+                {quests.done.map((done) => (
+                  <li key={done.id} className={`flex items-center justify-between gap-2 px-2 py-1 text-[10px] text-dim ${done === latestDone ? "animate-quest-done" : ""}`}>
+                    <span>
+                      <span className="text-grass">✓</span> {questById(done.id).title.toLowerCase()}
+                    </span>
+                    <span className="text-gold/80">{done.banked ? "banked" : rewardText(questById(done.id).reward)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="mt-2 px-0.5 text-[10px] text-dim">
+              {complete ? "build complete. quests closed for this run." : "the streak quest resets whenever you reroll."}
+              {hasBank ? <span className="text-gold/80"> banked for next run: {rewardText(bank)}.</span> : null}
+            </p>
+          </section>
+        </div>
 
-        {/* CENTER — attribute board */}
-        <section className="pixel-frame order-2 flex min-w-0 flex-col bg-turf lg:order-none">
+        <section className="pixel-frame order-2 bg-turf p-3 sm:p-4 lg:order-none">
+          <div className="border border-line bg-night/50 px-4 py-3 text-center sm:py-4">
+            <p className="font-pixel text-[10px] tracking-[0.35em] text-haze">{complete ? "BUILD COMPLETE" : `PICK ${round} OF 10`}</p>
+            <h2 className="mt-1.5 font-pixel text-lg tracking-[0.12em] text-chalk sm:text-2xl">{complete ? "SIGN FOR A CLUB" : rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}</h2>
+            {!complete ? (
+              <div key={denied} className={`mt-4 hidden flex-wrap justify-center gap-2 lg:flex ${denied ? "animate-shake" : ""}`}>
+                {rerollButtons(false)}
+              </div>
+            ) : null}
+            {lastPick && !complete ? (
+              <p key={`${lastPick.key}-${taken}`} className="animate-tile-in mt-2 text-[11px] text-haze lg:mt-3">
+                last pull: <span className={tier(lastPick.value).text}>{lastPick.value} {lastPick.label.toLowerCase()}</span> from {lastPick.playerName}
+              </p>
+            ) : !complete ? (
+              <p className="mt-2 text-[11px] text-haze sm:hidden">── {ROUND_LINES[taken]}</p>
+            ) : null}
+          </div>
+
           {!complete ? (
             <>
-              <div key={denied} className={`grid border-b border-line sm:grid-cols-[minmax(0,1.15fr)_1fr_1fr] ${denied ? "animate-shake" : ""}`}>
-                <div className="flex items-center gap-2 border-b border-line px-3 py-2.5 sm:border-r sm:border-b-0">
-                  <span className="font-pixel text-sm tracking-[0.1em] text-chalk sm:text-base">
-                    {rollSpin ? "ROLLING…" : "PICK AN ATTRIBUTE"}
-                  </span>
-                </div>
-                <div className="hidden border-r border-line sm:block">{teamRerollButton(false)}</div>
-                <div className="hidden sm:block">{playerRerollButton(false)}</div>
-              </div>
-
-              <div className="grid flex-1 grid-cols-2 content-start gap-1.5 p-2 sm:gap-2 sm:p-3">
+              <p className="mt-3 truncate font-pixel text-[10px] tracking-[0.25em] text-haze sm:mt-4">
+                CHOOSE ONE FROM <span className="text-flood">{rollSpin ? "…" : rolled.name.toUpperCase()}</span>
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2">
                 {rolled.stats.map((stat, index) => {
                   const owned = locked[stat.key];
                   const info = tier(stat.value);
+                  const delta = stat.value - stat.ea;
                   const hint = !owned && !spinning ? tileChemHint(rolled, lockedStats, stat.key) : null;
                   return (
                     <button
@@ -982,39 +1029,42 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       type="button"
                       disabled={spinning}
                       onClick={() => choose(stat)}
-                      className={`animate-tile-in relative flex min-h-[88px] min-w-0 flex-col border px-2.5 py-2 text-left transition sm:min-h-[96px] sm:px-3 ${
+                      style={{ animationDelay: `${index * 30}ms` }}
+                      className={`group relative min-w-0 border px-2.5 py-2 text-left transition sm:px-3 ${spinning ? "" : "animate-tile-in"} ${
                         owned
-                          ? "cursor-not-allowed border-line/40 bg-night/35"
-                          : "border-line bg-stand hover:border-flood hover:bg-[#163528] active:translate-y-px"
+                          ? "cursor-not-allowed border-line/60 bg-night/40"
+                          : rolled.prime
+                            ? "border-kit/70 bg-stand hover:-translate-y-0.5 hover:border-gold hover:bg-[#13223b] active:translate-y-0"
+                            : "border-line bg-stand hover:-translate-y-0.5 hover:border-flood hover:bg-[#13223b] active:translate-y-0"
                       }`}
-                      style={{ animationDelay: `${index * 18}ms` }}
                     >
                       <span className="flex items-start justify-between gap-2">
-                        <span className={`font-pixel text-[11px] tracking-[0.1em] sm:text-xs ${owned ? "text-dim" : "text-chalk"}`}>
-                          {stat.label.toUpperCase()}
+                        <span className="min-w-0">
+                          <span className={`block truncate font-pixel text-[10px] tracking-[0.12em] sm:text-xs sm:tracking-[0.15em] ${owned ? "text-dim" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
+                          <span className={`mt-0.5 block truncate text-[10px] text-dim ${owned ? "" : "hidden sm:block"}`}>{owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}</span>
                         </span>
                         <Key className="hidden lg:inline-grid">{index === 9 ? 0 : index + 1}</Key>
                       </span>
-                      <span className="mt-auto flex items-end justify-between gap-2 pt-1">
-                        <span className="min-w-0 flex-1">
-                          {owned ? (
-                            <span className="block truncate text-[10px] text-dim">locked · {owned.playerName}</span>
-                          ) : spinning ? null : (
-                            <span className={`block font-pixel text-[9px] tracking-[0.14em] ${info.text}`}>
-                              + {info.label.toUpperCase()}
+                      <span className="mt-1 flex items-end justify-between gap-1">
+                        {owned || spinning ? (
+                          <span />
+                        ) : (
+                          <span className="min-w-0 font-pixel text-[8px] tracking-widest sm:text-[9px]">
+                            <span className={`block ${info.text} opacity-80`}>{info.label.toUpperCase()}</span>
+                            <span className="block truncate text-dim normal-case tracking-normal">
+                              {stat.form === null ? `EA ${stat.ea}` : `EA ${stat.ea} · form ${stat.form}`}
+                              {delta ? ` · ${delta > 0 ? "+" : "−"}${Math.abs(delta)}` : ""}
                             </span>
-                          )}
-                        </span>
+                          </span>
+                        )}
                         {spinning ? (
                           <span className="animate-roll-glow font-digits text-4xl leading-none text-dim sm:text-5xl">??</span>
                         ) : (
-                          <span className={`font-digits text-4xl leading-none sm:text-5xl ${owned ? "text-dim line-through decoration-1" : info.text}`}>
-                            {stat.value}
-                          </span>
+                          <span className={`font-digits text-4xl leading-none sm:text-5xl ${owned ? "text-dim line-through decoration-1" : info.text}`}>{stat.value}</span>
                         )}
                       </span>
                       {hint ? (
-                        <div className="mt-2 -mx-2.5 -mb-2 sm:-mx-3 sm:-mb-2">
+                        <div className="mt-2 -mx-2.5 -mb-2 sm:-mx-3">
                           <ChemBar hint={hint} compact />
                         </div>
                       ) : null}
@@ -1022,39 +1072,29 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   );
                 })}
               </div>
-
-              <p className="border-t border-line px-3 py-2 text-[11px] text-haze">
-                {lastPick ? (
-                  <>
-                    last pull: <span className={tier(lastPick.value).text}>{lastPick.value} {lastPick.label.toLowerCase()}</span> from {lastPick.playerName}
-                  </>
-                ) : (
-                  <span className="text-dim">{ROUND_LINES[taken]}</span>
-                )}
-              </p>
+              <p className="mt-3 hidden text-[10px] tracking-wide text-dim lg:block">1–0 to pick · T new club · Y same club, new player · M mute</p>
             </>
           ) : profile ? (
-            <div className="flex flex-1 flex-col justify-center p-5 text-center sm:p-8">
+            <div className="mt-4 border border-line bg-night/50 p-4">
               {!club || spin?.kind === "club" ? (
-                <>
+                <div className="text-center">
                   <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">THE LAST ROLL</p>
-                  <p className={`mt-3 min-h-12 font-digits text-4xl uppercase sm:text-5xl ${spin?.kind === "club" ? "animate-ticker text-flood" : "text-dim"}`}>
-                    {spin?.kind === "club" ? spin.title : "which club signs you?"}
-                  </p>
-                  <button type="button" onClick={rollClub} disabled={spinning} className="glow-flood mt-5 w-full bg-turf py-3 font-pixel text-sm tracking-[0.25em] hover:bg-stand disabled:opacity-40">
+                  <p className={`mt-3 min-h-12 font-digits text-4xl uppercase sm:text-5xl ${spin?.kind === "club" ? "animate-ticker text-flood" : "text-dim"}`}>{spin?.kind === "club" ? spin.title : "which club signs you?"}</p>
+                  <button type="button" onClick={rollClub} disabled={spinning} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand disabled:opacity-40">
                     ▶ ROLL YOUR CLUB ◀
                   </button>
-                </>
+                </div>
               ) : (
-                <div key={`club-${rollCount}`} className="animate-card-pop">
+                <div key={`club-${rollCount}`} className="animate-card-pop text-center">
                   <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">YOU SIGN FOR</p>
-                  <p className="title-split mt-2 font-pixel text-3xl tracking-[0.06em] text-chalk sm:text-4xl">{club.name.toUpperCase()}</p>
-                  <p className="mx-auto mt-3 max-w-md text-xs text-haze">
-                    attack {profile.attack.toFixed(1)} · defence {profile.defense.toFixed(1)}
-                    {chemistry.links.length ? ` · ${chemistry.links.length} chemistry` : ""}.
-                    {replaced ? ` ${replaced.name} is dropped.` : ""}
+                  <p className="title-split mt-2 font-pixel text-2xl tracking-[0.08em] text-chalk sm:text-3xl">{club.name.toUpperCase()}</p>
+                  <p className="mx-auto mt-3 max-w-md text-xs leading-relaxed text-haze">
+                    attack {profile.attack.toFixed(1)} · defence {profile.defense.toFixed(1)}.{replaced ? ` ${replaced.name} (${replaced.overall}) is dropped to make room.` : ""}
                   </p>
-                  <button type="button" onClick={playSeason} className="glow-flood mt-5 w-full bg-turf py-3 font-pixel text-sm tracking-[0.25em] hover:bg-stand">
+                  <p className="mx-auto mt-2 max-w-md text-[11px] text-dim">
+                    season bonus: <span className="text-gold/80">champions +2 team +2 player · top four +1 each · top seven +1 player</span>
+                  </p>
+                  <button type="button" onClick={playSeason} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand">
                     ▶ PLAY 38 MATCHWEEKS ◀
                   </button>
                 </div>
@@ -1063,22 +1103,21 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           ) : null}
         </section>
 
-        {/* RIGHT — your build + chemistry */}
-        <aside className="pixel-frame order-3 flex flex-col bg-turf lg:order-none">
-          <div className="flex items-end justify-between border-b border-line px-3 py-2">
+        <section className="pixel-frame order-4 bg-turf p-3 lg:order-none">
+          <div className="flex items-end justify-between border-b border-line px-1 pb-3">
             <div>
-              <p className="font-pixel text-[10px] tracking-[0.25em] text-haze">YOUR BUILD</p>
-              <p className="text-[10px] text-dim">{taken}/10 locked</p>
-            </div>
-            <div className="text-right">
-              <p className={`font-digits text-5xl leading-none ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
-              <p className={`font-pixel text-[9px] tracking-widest ${taken ? tier(rating).text : "text-dim"}`}>
-                {taken ? tier(rating).label.toUpperCase() : "OPEN"}
+              <p className="font-pixel text-[11px] tracking-[0.3em] text-haze">YOUR BUILD</p>
+              <p className="mt-1 text-[10px] text-dim">
+                {taken} / 10 attributes
+                {chemistry.links.length ? ` · ${chemistry.links.length} chem` : ""}
               </p>
             </div>
+            <div className="text-right">
+              <p className={`font-digits text-5xl leading-none lg:text-6xl ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
+              <p className={`font-pixel text-[9px] tracking-widest ${taken ? tier(rating).text : "text-dim"}`}>{taken ? tier(rating).label.toUpperCase() : "UNBUILT"}</p>
+            </div>
           </div>
-
-          <div className="flex-1 space-y-0.5 px-2 py-2">
+          <div className="mt-2 grid grid-cols-5 gap-1 lg:grid-cols-1 lg:gap-1.5">
             {BUILD_STATS.map((definition) => {
               const slot = locked[definition.key];
               const chem = chemistry.boosts.get(definition.key) ?? 0;
@@ -1086,26 +1125,23 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
               return (
                 <div
                   key={definition.key}
-                  className={`flex items-center justify-between gap-2 px-1.5 py-1 ${slot ? "bg-stand/70" : ""}`}
+                  title={slot ? `${definition.label} ${shown}${chem ? ` (+${chem} chem)` : ""} · ${slot.playerName}` : definition.label}
+                  className={`flex flex-col items-center gap-0.5 border px-1 py-1.5 lg:flex-row lg:justify-between lg:gap-2 lg:px-2.5 ${slot ? "animate-slot-fill border-line bg-stand" : "border-dashed border-line/70"} ${chem ? "border-grass/60" : ""}`}
                 >
-                  <div className="min-w-0">
-                    <p className={`font-pixel text-[10px] tracking-[0.1em] ${slot ? "text-chalk" : "text-dim"}`}>
-                      {definition.label.toUpperCase()}
+                  <div className="min-w-0 text-center lg:text-left">
+                    <p className={`font-pixel text-[9px] tracking-[0.12em] lg:text-[10px] lg:tracking-[0.15em] ${slot ? "text-chalk" : "text-dim"}`}>
+                      <span className="lg:hidden">{SHORT_LABEL[definition.key]}</span>
+                      <span className="hidden lg:inline">{definition.label.toUpperCase()}</span>
                     </p>
-                    <p className="truncate text-[10px] text-dim">
-                      {slot ? `${slot.playerName}${chem ? ` · +${chem}` : ""}` : "open"}
-                    </p>
+                    <p className="hidden truncate text-[10px] text-dim lg:block">{slot ? `${slot.playerName}${chem ? ` · +${chem}` : ""}` : "open"}</p>
                   </div>
-                  <p className={`font-digits text-2xl leading-none ${shown !== null ? tier(shown).text : "text-line"}`}>
-                    {shown ?? "--"}
-                  </p>
+                  <p className={`font-digits text-2xl leading-none lg:text-3xl ${shown !== null ? tier(shown).text : "text-line"}`}>{shown ?? "--"}</p>
                 </div>
               );
             })}
           </div>
-
-          <div className="border-t border-line px-3 py-2">
-            <p className="font-pixel text-[9px] tracking-[0.28em] text-grass">CHEMISTRY</p>
+          <div className="mt-3 border-t border-line pt-2">
+            <p className="font-pixel text-[10px] tracking-[0.25em] text-grass">CHEMISTRY</p>
             {chemistry.links.length ? (
               <ul className="mt-1.5 space-y-1">
                 {chemistry.links.map((link) => (
@@ -1125,13 +1161,20 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 ))}
               </ul>
             ) : (
-              <p className="mt-1.5 text-[10px] leading-snug text-dim">
-                bars light up as teammates x/3, nation x/3, back line x/3 once you stack matching picks.
-              </p>
+              <p className="mt-1.5 text-[10px] text-dim">bars light up as teammates x/3 once you stack clubmates, internationals or a back line.</p>
             )}
           </div>
-        </aside>
+          <div className="mt-3 flex gap-1" aria-hidden="true">
+            {TIERS.map((item) => (
+              <span key={item.label} className="flex flex-1 flex-col items-center gap-1">
+                <span className={`h-1 w-full ${item.bg}`} />
+                <span className="text-[8px] text-dim">{item.min ? `${item.min}+` : "<70"}</span>
+              </span>
+            ))}
+          </div>
+        </section>
       </div>
+      <footer className="mx-auto max-w-[1320px] 2xl:max-w-[1560px] px-4 pb-6 text-[10px] text-dim lg:px-5">ratings: EA SPORTS FC via ea.com · minutes &amp; goals: premierleague.com {data.season} · a fan project, not affiliated with either</footer>
 
       {!complete ? (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-night/95 backdrop-blur lg:hidden">
@@ -1140,8 +1183,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
               <p className={`font-digits text-3xl leading-none ${taken ? tier(rating).text : "text-line"}`}>{taken ? rating : "--"}</p>
               <p className="font-pixel text-[8px] tracking-widest text-dim">BUILD</p>
             </div>
-            {teamRerollButton(true)}
-            {playerRerollButton(true)}
+            {rerollButtons(true)}
           </div>
         </div>
       ) : null}
