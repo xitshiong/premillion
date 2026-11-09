@@ -234,14 +234,15 @@ function JerseyBack({
 
         {prime ? (
           <g>
-            <rect x="100" y="156" width="60" height="14" fill="#ff5a3c" stroke="#0a0a0a" strokeWidth="0.8" />
+            <rect x="62" y="148" width="136" height="28" fill="#ff5a3c" stroke="#0a0a0a" strokeWidth="1.4" />
             <text
               x="130"
-              y="166"
+              y="168"
               textAnchor="middle"
               fill="#06140e"
-              fontSize="8"
-              letterSpacing="1.6"
+              fontSize="18"
+              letterSpacing="3"
+              fontWeight={700}
               style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
             >
               PRIME
@@ -1085,7 +1086,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       <p className={`font-digits text-4xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</p>
                       <p className="font-pixel text-[10px] text-chalk">{rolled.eaPosition}</p>
                     </div>
-                    <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 font-pixel text-[8px] tracking-widest lg:top-2 lg:left-2 lg:text-[9px] ${rolled.prime ? "bg-kit text-night" : rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}>
+                    <span className={`absolute top-1.5 left-1.5 font-pixel tracking-widest lg:top-2 lg:left-2 ${rolled.prime ? "bg-kit px-2.5 py-1.5 text-[13px] text-night sm:text-[14px] lg:px-3 lg:py-2 lg:text-[15px]" : `px-1.5 py-0.5 text-[8px] lg:text-[9px] ${rolled.role === "First team" ? "bg-gold text-night" : "bg-flood text-night"}`}`}>
                       {rolled.prime ? "PRIME" : rolled.role.toUpperCase()}
                     </span>
                   </>
@@ -1099,7 +1100,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     <p className="mt-2 flex flex-wrap items-center gap-2 lg:hidden">
                       <span className={`font-digits text-3xl leading-none ${tier(rolled.overall).text}`}>{rolled.overall}</span>
                       <span className="font-pixel text-[9px] tracking-widest text-haze">OVR · {rolled.eaPosition}</span>
-                      {rolled.prime ? <span className="bg-kit px-1.5 py-0.5 font-pixel text-[8px] tracking-widest text-night">PRIME</span> : null}
+                      {rolled.prime ? <span className="bg-kit px-2 py-1 font-pixel text-[12px] tracking-widest text-night">PRIME</span> : null}
                     </p>
                     <p className="mt-2 text-[11px] text-haze lg:mt-3">
                       {rolled.nationality ?? "—"} · {rolled.appearances} apps · {rolled.minutes}&apos; · {rolled.goals}g · {rolled.assists}a · EA {rolled.eaOverall}
