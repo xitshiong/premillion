@@ -24,8 +24,8 @@ import { BUILD_STATS, PRIME_CHANCE, asPrime, buildRating, clubWithUser, strength
 import { muteStore, sfx } from "@/lib/sfx";
 import { mulberry32, simulateSeason, tableAt, type MatchResult } from "@/lib/simulate";
 
-const PLAYER_REROLLS = 8;
-const TEAM_REROLLS = 6;
+const PLAYER_REROLLS = 5;
+const TEAM_REROLLS = 5;
 const TICK_MS = 70;
 const WEEK_MS = 150;
 const NO_REWARD: Reward = { team: 0, player: 0 };
@@ -154,22 +154,34 @@ function RewardChip({ reward, muted = false }: { reward: Reward; muted?: boolean
   return <span className={`shrink-0 font-pixel text-[9px] tracking-[0.12em] ${muted ? "text-dim" : "text-gold"}`}>{rewardText(reward).toUpperCase()}</span>;
 }
 
-function ChemBar({ hint, compact = false }: { hint: ChemHint; compact?: boolean }) {
+function ChemBar({ hint, compact = false, tip }: { hint: ChemHint; compact?: boolean; tip?: string }) {
   const ratio = Math.min(1, hint.current / hint.target);
   const fill = hint.complete ? "bg-gold" : hint.color;
+  const howto = tip ?? hint.howto;
   return (
-    <div
-      className={`relative overflow-hidden bg-night/85 ${compact ? "h-[15px]" : "h-5"}`}
-      title={`${hint.label} ${hint.current}/${hint.target}${hint.complete ? " · complete" : ""}`}
-    >
-      <div className={`absolute inset-y-0 left-0 ${fill}`} style={{ width: `${Math.max(ratio * 100, 12)}%` }} />
-      <p
-        className={`relative z-[1] truncate px-1.5 font-pixel tracking-[0.04em] ${compact ? "text-[9px] leading-[15px]" : "text-[10px] leading-5"} ${
-          hint.complete || ratio >= 0.4 ? "text-night" : "text-chalk"
-        }`}
+    <div className={`group/chem relative ${compact ? "" : "z-10"}`}>
+      <div
+        className={`relative overflow-hidden bg-night/85 ${compact ? "h-[15px]" : "h-5"}`}
+        title={howto}
       >
-        {hint.label} {hint.current}/{hint.target}
-      </p>
+        <div className={`absolute inset-y-0 left-0 ${fill}`} style={{ width: `${Math.max(ratio * 100, 12)}%` }} />
+        <p
+          className={`relative z-[1] truncate px-1.5 font-pixel tracking-[0.04em] ${compact ? "text-[9px] leading-[15px]" : "text-[10px] leading-5"} ${
+            hint.complete || ratio >= 0.4 ? "text-night" : "text-chalk"
+          }`}
+        >
+          {hint.label} {hint.current}/{hint.target}
+        </p>
+      </div>
+      {!compact && howto ? (
+        <div className="pointer-events-none absolute right-0 bottom-full z-30 mb-1 hidden w-[min(240px,70vw)] border border-line bg-night px-2.5 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] group-hover/chem:block">
+          <p className="font-pixel text-[9px] tracking-[0.18em] text-grass">
+            {hint.label.toUpperCase()} {hint.current}/{hint.target}
+          </p>
+          <p className="mt-1 text-[11px] leading-snug text-chalk/90">{howto}</p>
+          {!hint.complete ? <p className="mt-1 text-[10px] text-gold">+{hint.boost} when complete</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -214,6 +226,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
   const [nameDraft, setNameDraft] = useState(career.name);
   const [sawPrime, setSawPrime] = useState(false);
   const [freshUnlocks, setFreshUnlocks] = useState<AchievementId[]>([]);
+  const [openQuestId, setOpenQuestId] = useState<string | null>(null);
 
   function maybePrime(player: RollPlayer, random: () => number = Math.random) {
     if (random() >= PRIME_CHANCE) return player;
@@ -317,6 +330,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     bonusPaid.current = false;
     setSawPrime(false);
     setFreshUnlocks([]);
+    setOpenQuestId(null);
     setPhase("build");
     rollFreshTeam();
   }
@@ -967,14 +981,25 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           <section className="pixel-frame order-3 bg-turf p-3 lg:order-none">
             <div className="flex items-baseline justify-between gap-2 px-0.5">
               <p className="font-pixel text-[11px] tracking-[0.3em] text-gold">QUESTS</p>
-              <p className="text-[10px] text-dim">{quests.done.length} done · rewards are rerolls</p>
+              <p className="text-[10px] text-dim">{quests.done.length} done · tap for how</p>
             </div>
             <div className="mt-2 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-1">
               {quests.active.map((active) => {
                 const quest = questById(active.id);
                 const progress = complete ? 0 : questProgress(active, lockedStats, lastRerollAt);
+                const open = openQuestId === active.id;
                 return (
-                  <div key={`${active.id}-${active.since}`} className={`border px-2.5 py-2 ${complete ? "border-line/60 opacity-50" : "animate-tile-in border-line bg-stand"}`}>
+                  <button
+                    key={`${active.id}-${active.since}`}
+                    type="button"
+                    disabled={complete}
+                    onClick={() => {
+                      if (complete) return;
+                      sfx().play("click");
+                      setOpenQuestId(open ? null : active.id);
+                    }}
+                    className={`btn-game border px-2.5 py-2 text-left ${complete ? "border-line/60 opacity-50" : open ? "animate-tile-in border-flood bg-stand" : "animate-tile-in border-line bg-stand hover:border-flood/70"}`}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-pixel text-[10px] tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
                       <RewardChip reward={quest.reward} muted={complete} />
@@ -984,7 +1009,16 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                         <span key={index} className={`h-1 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
                       ))}
                     </div>
-                  </div>
+                    {open ? (
+                      <div className="mt-2 border-t border-line/80 pt-2">
+                        <p className="text-[11px] leading-snug text-chalk/90">{quest.detail}</p>
+                        <p className="mt-1 text-[10px] text-haze">
+                          {progress}/{quest.target}
+                          {quest.id === "streak" ? " · resets if you reroll" : ""}
+                        </p>
+                      </div>
+                    ) : null}
+                  </button>
                 );
               })}
             </div>
@@ -1183,7 +1217,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                         boost: link.boost,
                         complete: link.current >= link.target,
                         color: link.color,
+                        howto: link.howto,
                       }}
+                      tip={link.howto}
                     />
                   </li>
                 ))}

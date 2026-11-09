@@ -19,6 +19,8 @@ export type ChemTrack = {
   target: number;
   boost: number;
   keys: BuildStatKey[] | "all";
+  /** Short instruction for completing this chemistry. */
+  howto: string;
   /** How many unique matching players are already in the build. */
   count: (players: ChemPlayer[]) => number;
   /** Whether the rolled player belongs on this track. */
@@ -44,12 +46,14 @@ export type ChemHint = {
   boost: number;
   complete: boolean;
   color: string;
+  howto: string;
 };
 
 export type ChemLink = {
   id: string;
   title: string;
   detail: string;
+  howto: string;
   boost: number;
   keys: BuildStatKey[] | "all";
   playerIds: number[];
@@ -101,6 +105,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: "all",
       color: "bg-grass",
+      howto: `lock ${3} players from ${player.teamName}`,
       count: (players) => players.filter((item) => item.teamId === player.teamId).length,
       includes: (item) => item.teamId === player.teamId,
     },
@@ -112,6 +117,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: "all",
       color: "bg-flood",
+      howto: player.nationality ? `lock 3 players from ${player.nationality}` : "lock 3 players from the same country",
       count: (players) => players.filter((item) => item.nationality && item.nationality === player.nationality).length,
       includes: (item) => Boolean(player.nationality && item.nationality === player.nationality),
     },
@@ -122,6 +128,9 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: "all",
       color: "bg-gold",
+      howto: player.nationality
+        ? `lock 2 ${player.nationality} players at ${player.teamName}`
+        : `lock 2 players who share club and country at ${player.teamName}`,
       count: (players) =>
         players.filter((item) => item.teamId === player.teamId && item.nationality && item.nationality === player.nationality).length,
       includes: (item) => item.teamId === player.teamId && Boolean(player.nationality && item.nationality === player.nationality),
@@ -133,6 +142,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: DEF_KEYS,
       color: "bg-flood",
+      howto: "lock 3 defenders · boosts defending, physical, reactions, heading",
       count: (players) => players.filter((item) => item.position === "D").length,
       includes: (item) => item.position === "D",
     },
@@ -143,6 +153,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: MID_KEYS,
       color: "bg-grass",
+      howto: "lock 3 midfielders · boosts passing, dribbling, vision, pace",
       count: (players) => players.filter((item) => item.position === "M").length,
       includes: (item) => item.position === "M",
     },
@@ -153,6 +164,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: FWD_KEYS,
       color: "bg-kit",
+      howto: "lock 3 forwards · boosts shooting, finishing, pace, dribbling",
       count: (players) => players.filter((item) => item.position === "F").length,
       includes: (item) => item.position === "F",
     },
@@ -163,6 +175,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 2,
       keys: "all",
       color: "bg-kit",
+      howto: "lock 2 prime players",
       count: (players) => players.filter((item) => item.prime).length,
       includes: (item) => Boolean(item.prime),
     },
@@ -173,6 +186,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 1,
       keys: ["reactions", "phy"],
       color: "bg-gold",
+      howto: "lock one first-teamer and one bench player · boosts reactions & physical",
       count: (players) => {
         const first = players.some((item) => item.role === "First team");
         const bench = players.some((item) => item.role === "Bench");
@@ -187,6 +201,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       boost: 1,
       keys: "all",
       color: "bg-grass",
+      howto: "lock a defender, a midfielder and a forward",
       count: (players) => new Set(players.map((item) => item.position).filter((position) => position === "D" || position === "M" || position === "F")).size,
       includes: (item) => item.position === "D" || item.position === "M" || item.position === "F",
     },
@@ -195,6 +210,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
 
 function trackProgress(track: ChemTrack, players: ChemPlayer[]): ChemHint {
   const current = Math.min(track.target, track.count(players));
+  const left = Math.max(0, track.target - current);
   return {
     id: track.id,
     label: track.label,
@@ -203,6 +219,7 @@ function trackProgress(track: ChemTrack, players: ChemPlayer[]): ChemHint {
     boost: track.boost,
     complete: current >= track.target,
     color: track.color,
+    howto: current >= track.target ? `complete · +${track.boost} to linked stats` : `${track.howto} · need ${left} more`,
   };
 }
 
@@ -240,6 +257,7 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
         id: key,
         title,
         detail: `${hint.current}/${hint.target}`,
+        howto: hint.howto,
         boost: hint.complete ? track.boost : Math.max(1, Math.floor(track.boost / 2)),
         keys: track.keys,
         playerIds: memberIds,
