@@ -63,7 +63,8 @@ export type ChemLink = {
   detail: string;
   howto: string;
   boost: number;
-  keys: BuildStatKey[] | "all";
+  /** Only the locked attribute keys from chemistry players — never a blanket all-stats buff. */
+  keys: BuildStatKey[];
   playerIds: number[];
   current: number;
   target: number;
@@ -311,7 +312,10 @@ function trackProgress(track: ChemTrack, players: ChemPlayer[]): ChemHint {
     boost: track.boost,
     complete: current >= track.target,
     color: track.color,
-    howto: current >= track.target ? `complete · +${track.boost} to linked stats` : `${track.howto} · need ${left} more`,
+    howto:
+      current >= track.target
+        ? `complete · +${track.boost} on locked attributes from these players`
+        : `${track.howto} · need ${left} more`,
   };
 }
 
@@ -357,6 +361,11 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
       if (hint.current < minShow) continue;
       const memberIds = players.filter((item) => track.includes(item)).map((item) => item.playerId);
       if (memberIds.length < 2 && track.id !== "spine" && track.id !== "squad-depth" && track.id !== "gloves") continue;
+      const memberPicks = picks.filter((pick) => memberIds.includes(pick.playerId));
+      const lockedKeys = [...new Set(memberPicks.map((pick) => pick.key))] as BuildStatKey[];
+      // Only buff attributes someone actually locked — never every stat on the card.
+      const keys =
+        track.keys === "all" ? lockedKeys : track.keys.filter((statKey) => lockedKeys.includes(statKey));
       seen.add(key);
       const title =
         track.id === "mates" || track.id === "teammates" || track.id === "clubhouse" || track.id === "star-pair"
@@ -366,20 +375,31 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
             : track.label;
       // Ladder tracks only pay out when complete. Unique tracks can drip when one away.
       const nearComplete = hint.current >= track.target - 1;
-      const drip = hint.complete
-        ? track.boost
-        : LADDER_IDS.has(track.id)
+      const canPay = keys.length > 0;
+      const drip =
+        !canPay
           ? 0
-          : nearComplete || track.target <= 2
-            ? Math.max(1, Math.floor(track.boost / 2))
-            : 0;
+          : hint.complete
+            ? track.boost
+            : LADDER_IDS.has(track.id)
+              ? 0
+              : nearComplete || track.target <= 2
+                ? Math.max(1, Math.floor(track.boost / 2))
+                : 0;
+      const keyLabels = keys.join(", ");
       links.push({
         id: key,
         title,
         detail: `${hint.current}/${hint.target}`,
-        howto: hint.howto,
+        howto: !canPay
+          ? `${hint.howto} · lock a matching attribute to cash in`
+          : drip
+            ? `${hint.howto} · +${drip} on ${keyLabels}`
+            : hint.complete
+              ? `${hint.howto} · +${track.boost} on ${keyLabels}`
+              : hint.howto,
         boost: drip,
-        keys: track.keys,
+        keys,
         playerIds: memberIds,
         current: hint.current,
         target: track.target,
@@ -494,12 +514,12 @@ export function rolledChemHints(rolled: RollPlayer, picks: PickRecord[]): ChemHi
 export function chemistryBoosts(picks: PickRecord[], links = evaluateChemistry(picks)) {
   const boosts = new Map<string, number>();
   for (const pick of picks) {
-    // Family exclusivity is already applied on link.boost; just sum paying links.
+    // Only the locked attribute from a chemistry player can receive the boost.
     let total = 0;
     for (const link of links) {
       if (link.boost <= 0) continue;
       if (!link.playerIds.includes(pick.playerId)) continue;
-      if (link.keys !== "all" && !link.keys.includes(pick.key)) continue;
+      if (!link.keys.includes(pick.key)) continue;
       total += link.boost;
     }
     boosts.set(pick.key, Math.min(CHEM_BOOST_CAP, total));
