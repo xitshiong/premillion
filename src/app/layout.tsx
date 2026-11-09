@@ -18,10 +18,10 @@ const mono = Share_Tech_Mono({ subsets: ["latin"], weight: "400", variable: "--n
 
 export const metadata: Metadata = {
   title: {
-    default: "Frankenballer · stitch a Premier League player",
-    template: "%s · Player Book",
+    default: "Premillion · can you win the Prem with your player?",
+    template: "%s · Premillion",
   },
-  description: "Roll Premier League players, steal attributes, build chemistry, and play the season.",
+  description: "Roll Premier League players, stitch a build, and chase the title.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

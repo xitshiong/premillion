@@ -1,6 +1,6 @@
-# Frankenballer
+# Premillion
 
-A Premier League build game. You stitch one footballer together from ten real players, then play a season with him. It sits on top of a database of the players on 2026/27 Premier League club lists, and the stat book at `/book` lets you browse that data.
+Can you win the Prem with your player? Stitch one footballer from ten real Premier League players, then play a season. It sits on top of a database of the players on 2026/27 Premier League club lists, and the stat book at `/book` lets you browse that data.
 
 The look is a night matchday board: pitch greens, floodlight amber, condensed scoreboard type, and a pixel stadium. It keeps a dark game energy without copying krillion's cyan/pink CRT look. The intro opens on your profile and achievements first. Every sound is synthesized live with the Web Audio API, so there are no audio files. Sound starts when you press Kick Off. M mutes it, and the setting is remembered. Keys: Enter starts, T rerolls the team, Y rerolls the player, 1–9 and 0 pick a stat.
 

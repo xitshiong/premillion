@@ -55,7 +55,7 @@ const book = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(book, sheet, "Players");
 
 const legend = XLSX.utils.aoa_to_sheet([
-  ["Frankenballer player stats"],
+  ["Premillion player stats"],
   ["Season", data.season],
   ["Players", rows.length],
   ["Generated", new Date().toISOString()],
@@ -71,7 +71,7 @@ XLSX.utils.book_append_sheet(book, legend, "Notes");
 
 const outDir = path.resolve("exports");
 fs.mkdirSync(outDir, { recursive: true });
-const filename = `frankenballer-player-stats-${data.season.replace("/", "-")}.xlsx`;
+const filename = `premillion-player-stats-${data.season.replace("/", "-")}.xlsx`;
 const outPath = path.join(outDir, filename);
 XLSX.writeFile(book, outPath);
 

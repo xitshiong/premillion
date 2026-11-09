@@ -43,7 +43,8 @@ export type SfxEvent =
   | "click"
   | "hover";
 
-const MUTE_KEY = "frankenballer:muted";
+const MUTE_KEY = "premillion:muted";
+const LEGACY_MUTE_KEY = "frankenballer:muted";
 
 class Sfx {
   private ctx: AudioContext | null = null;
@@ -51,7 +52,10 @@ class Sfx {
   muted = false;
 
   constructor() {
-    if (typeof window !== "undefined") this.muted = window.localStorage.getItem(MUTE_KEY) === "1";
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(MUTE_KEY) ?? window.localStorage.getItem(LEGACY_MUTE_KEY);
+      this.muted = stored === "1";
+    }
   }
 
   private ensure() {

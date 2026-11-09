@@ -48,7 +48,8 @@ export type Profile = {
   updatedAt: number;
 };
 
-const KEY = "frankenballer:profile";
+const KEY = "premillion:profile";
+const LEGACY_KEY = "frankenballer:profile";
 const DEFAULT: Profile = {
   name: "Manager",
   runs: 0,
@@ -71,7 +72,7 @@ function read(): Profile {
   if (cache) return cache;
   if (typeof window === "undefined") return DEFAULT;
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(KEY) ?? window.localStorage.getItem(LEGACY_KEY);
     cache = raw ? { ...DEFAULT, ...JSON.parse(raw) } : { ...DEFAULT };
   } catch {
     cache = { ...DEFAULT };

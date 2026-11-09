@@ -546,7 +546,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
     <header className="sticky top-0 z-30 border-b border-line bg-night/90 backdrop-blur">
       <div className="mx-auto flex max-w-[1320px] 2xl:max-w-[1560px] items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-5">
         <button type="button" onClick={() => setPhase("intro")} className="title-split shrink-0 font-pixel text-sm tracking-[0.04em] text-chalk sm:text-xl sm:tracking-[0.12em]">
-          FRANKENBALLER
+          PREMILLION
         </button>
         {phase === "build" ? (
           <div className="min-w-0 text-center">
@@ -601,7 +601,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
           <div className="relative">
             <PixelStadium className="h-[32vh] min-h-[200px] sm:h-[42vh] sm:min-h-[260px]" />
             <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-              <h1 className="title-split animate-flicker font-pixel text-[12vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">FRANKENBALLER</h1>
+              <h1 className="title-split animate-flicker font-pixel text-[12vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">PREMILLION</h1>
               <p className="mt-3 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-[10px] tracking-[0.4em] text-flood sm:text-sm">{data.season}</p>
             </div>
           </div>
@@ -616,7 +616,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
             >
               ▶ {taken > 0 || season ? "RESUME" : "KICK OFF"} ◀
             </button>
-            <p className="mt-3 font-pixel text-[10px] tracking-[0.28em] text-haze">10 PLAYERS · 10 STATS · 38 WEEKS</p>
+            <p className="mt-3 max-w-md text-center font-pixel text-[11px] tracking-[0.14em] text-haze sm:text-xs">
+              CAN YOU WIN THE PREM WITH YOUR PLAYER?
+            </p>
 
             <section className="pixel-frame mt-8 w-full bg-turf p-4 sm:p-5">
               <div className="flex flex-wrap items-end justify-between gap-3">
