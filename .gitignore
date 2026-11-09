@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+tmp-scaffold/
+data/raw/
+agent-tools/
+*.tsbuildinfo
+*.log
+.DS_Store
