@@ -38,6 +38,8 @@
   --animate-shake: shake 260ms ease-in-out both;
   --animate-toast: toast 2600ms ease-out both;
   --animate-quest-done: quest-done 900ms ease-out both;
+  --animate-btn-pulse: btn-pulse 1.7s ease-in-out infinite;
+  --animate-btn-pop: btn-pop 280ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
 
   @keyframes toast {
     0% { opacity: 0; transform: translate(-50%, -14px) scale(0.9); }
@@ -92,6 +94,41 @@
     0%, 100% { opacity: 0.45; }
     50% { opacity: 1; }
   }
+  @keyframes btn-pulse {
+    0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 0 1px rgba(240, 193, 74, 0.95), 0 0 18px rgba(240, 193, 74, 0.22), inset 0 0 18px rgba(240, 193, 74, 0.06); }
+    50% { transform: translateY(-2px) scale(1.015); box-shadow: 0 0 0 1px rgba(240, 193, 74, 1), 0 0 28px rgba(240, 193, 74, 0.4), inset 0 0 22px rgba(240, 193, 74, 0.1); }
+  }
+  @keyframes btn-pop {
+    0% { transform: scale(0.94); }
+    100% { transform: scale(1); }
+  }
+}
+
+.btn-game {
+  transition:
+    transform 120ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 160ms ease,
+    opacity 120ms ease;
+  will-change: transform;
+}
+.btn-game:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02);
+}
+.btn-game:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+  transition-duration: 60ms;
+}
+.btn-game:disabled {
+  transform: none;
+}
+.btn-pulse {
+  animation: btn-pulse 1.7s ease-in-out infinite;
+}
+.btn-pulse:hover:not(:disabled),
+.btn-pulse:active:not(:disabled) {
+  animation: none;
 }
 
 /* Soft turf grain instead of CRT scanlines. */
@@ -133,8 +170,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-card-pop, .animate-tile-in, .animate-slot-fill, .animate-ticker, .animate-roll-glow,
-  .animate-flicker, .animate-bob, .animate-blink, .animate-shake, .animate-quest-done {
+  .animate-flicker, .animate-bob, .animate-blink, .animate-shake, .animate-quest-done,
+  .btn-pulse {
     animation: none;
+  }
+  .btn-game:hover:not(:disabled),
+  .btn-game:active:not(:disabled) {
+    transform: none;
   }
 }
 

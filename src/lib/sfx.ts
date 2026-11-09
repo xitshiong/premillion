@@ -39,7 +39,9 @@ export type SfxEvent =
   | "relegated"
   | "midtable"
   | "quest"
-  | "deny";
+  | "deny"
+  | "click"
+  | "hover";
 
 const MUTE_KEY = "frankenballer:muted";
 
@@ -245,6 +247,13 @@ class Sfx {
         break;
       case "deny":
         this.tone({ f0: 150, f1: 62, dur: 0.25, peak: 0.16, lowpass: 700 });
+        break;
+      case "click":
+        this.tone({ type: "square", f0: 920, dur: 0.035, peak: 0.045, lowpass: 4200 });
+        this.tone({ type: "triangle", f0: 1480, dur: 0.07, peak: 0.03, delay: 0.018 });
+        break;
+      case "hover":
+        this.tone({ type: "sine", f0: 1560, dur: 0.028, peak: 0.018, lowpass: 3600 });
         break;
     }
   }

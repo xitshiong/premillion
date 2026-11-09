@@ -127,16 +127,24 @@ function Key({ children, className = "inline-grid" }: { children: React.ReactNod
 }
 
 function IconButton({ label, onClick, href, children }: { label: string; onClick?: () => void; href?: string; children: React.ReactNode }) {
-  const className = "grid size-8 shrink-0 place-items-center sm:size-9 border border-line bg-stand text-haze transition hover:border-flood hover:text-flood";
+  const className = "btn-game grid size-8 shrink-0 place-items-center border border-line bg-stand text-haze hover:border-flood hover:text-flood sm:size-9";
   if (href) {
     return (
-      <Link href={href} aria-label={label} title={label} className={className}>
+      <Link href={href} aria-label={label} title={label} className={className} onMouseEnter={() => sfx().play("hover")} onPointerDown={() => sfx().play("click")}>
         {children}
       </Link>
     );
   }
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={label} className={className}>
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => sfx().play("hover")}
+      onPointerDown={() => sfx().play("click")}
+      aria-label={label}
+      title={label}
+      className={className}
+    >
       {children}
     </button>
   );
@@ -577,98 +585,83 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
         {header}
         <div className="relative flex flex-1 flex-col">
           <div className="relative">
-            <PixelStadium className="h-[28vh] min-h-[180px] sm:h-[36vh] sm:min-h-[220px]" />
-            <div className="absolute inset-x-0 top-[10%] px-4 text-center">
-              <h1 className="title-split animate-flicker font-pixel text-[11vw] leading-none tracking-[0.04em] text-chalk sm:text-6xl lg:text-7xl">FRANKENBALLER</h1>
-              <p className="mt-3 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-[10px] tracking-[0.4em] text-flood sm:text-sm">THE {data.season} BUILD</p>
+            <PixelStadium className="h-[32vh] min-h-[200px] sm:h-[42vh] sm:min-h-[260px]" />
+            <div className="absolute inset-x-0 top-[12%] px-4 text-center">
+              <h1 className="title-split animate-flicker font-pixel text-[12vw] leading-none tracking-[0.04em] text-chalk sm:text-7xl lg:text-8xl">FRANKENBALLER</h1>
+              <p className="mt-3 inline-block border border-flood/40 bg-night/85 px-3 py-1.5 font-pixel text-[10px] tracking-[0.4em] text-flood sm:text-sm">{data.season}</p>
             </div>
           </div>
-          <div className="relative mx-auto grid w-full max-w-[1100px] flex-1 gap-4 px-4 pt-5 pb-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-            <section className="pixel-frame bg-turf p-4 text-left sm:p-5">
+
+          <div className="relative mx-auto flex w-full max-w-[720px] flex-1 flex-col items-center px-4 pt-6 pb-8">
+            <button
+              type="button"
+              onClick={kickOff}
+              onMouseEnter={() => sfx().play("hover")}
+              onPointerDown={() => sfx().play("click")}
+              className="btn-game btn-pulse glow-flood w-full max-w-md bg-turf py-5 font-pixel text-xl tracking-[0.35em] text-chalk hover:bg-stand sm:text-2xl"
+            >
+              ▶ {taken > 0 || season ? "RESUME" : "KICK OFF"} ◀
+            </button>
+            <p className="mt-3 font-pixel text-[10px] tracking-[0.28em] text-haze">10 PLAYERS · 10 STATS · 38 WEEKS</p>
+
+            <section className="pixel-frame mt-8 w-full bg-turf p-4 sm:p-5">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <p className="font-pixel text-[10px] tracking-[0.3em] text-flood">YOUR PROFILE</p>
+                  <p className="font-pixel text-[10px] tracking-[0.3em] text-flood">MANAGER</p>
                   <input
                     value={nameDraft}
                     onChange={(event) => setNameDraft(event.target.value)}
                     onBlur={() => profileStore.setName(nameDraft)}
                     onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.currentTarget.blur();
-                      }
+                      if (event.key === "Enter") event.currentTarget.blur();
                     }}
                     maxLength={24}
-                    className="mt-1 w-full max-w-xs border-b border-line bg-transparent font-digits text-4xl uppercase outline-none placeholder:text-dim focus:border-flood"
-                    placeholder="MANAGER"
+                    className="mt-1 w-full max-w-xs border-b border-line bg-transparent font-digits text-3xl uppercase outline-none placeholder:text-dim focus:border-flood sm:text-4xl"
+                    placeholder="NAME"
                     aria-label="Manager name"
                   />
                 </div>
-                <p className="font-pixel text-[10px] tracking-[0.2em] text-dim">
-                  {career.runs} seasons · {career.builds} builds
+                <p className="font-pixel text-[10px] tracking-[0.18em] text-dim">
+                  {career.runs}S · {career.builds}B
                 </p>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mt-4 grid grid-cols-4 gap-2">
                 {[
                   { label: "best", value: career.bestPlace ? ordinal(career.bestPlace) : "—" },
                   { label: "titles", value: String(career.champions) },
                   { label: "top 4", value: String(career.topFour) },
                   { label: "primes", value: String(career.primesSeen) },
                 ].map((stat) => (
-                  <div key={stat.label} className="border border-line bg-night/50 px-3 py-2">
-                    <p className="font-pixel text-[9px] tracking-[0.2em] text-haze">{stat.label.toUpperCase()}</p>
-                    <p className="font-digits text-3xl leading-none text-chalk">{stat.value}</p>
+                  <div key={stat.label} className="border border-line bg-night/50 px-2 py-2 text-center sm:px-3">
+                    <p className="font-pixel text-[8px] tracking-[0.18em] text-haze sm:text-[9px]">{stat.label.toUpperCase()}</p>
+                    <p className="font-digits text-2xl leading-none text-chalk sm:text-3xl">{stat.value}</p>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-[11px] text-haze">
-                {career.lastClub ? `last club: ${career.lastClub}` : "no seasons played yet."} · {career.worldPicks} world-class pulls · {career.questsDone} quests cleared
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Trophy className="size-4 text-gold" />
-                <p className="font-pixel text-[10px] tracking-[0.3em] text-gold">
-                  ACHIEVEMENTS {career.unlocked.length}/{ACHIEVEMENTS.length}
+              <div className="mt-4 flex items-center gap-2">
+                <Trophy className="size-3.5 text-gold" />
+                <p className="font-pixel text-[10px] tracking-[0.28em] text-gold">
+                  {career.unlocked.length}/{ACHIEVEMENTS.length}
                 </p>
               </div>
-              <div className="mt-2 grid max-h-[14rem] gap-1.5 overflow-y-auto sm:grid-cols-2">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {ACHIEVEMENTS.map((item) => {
                   const got = unlocked.has(item.id);
                   return (
-                    <div key={item.id} className={`border px-2.5 py-2 ${got ? "border-gold/50 bg-gold/10" : "border-line/70 bg-night/30 opacity-55"}`}>
-                      <p className={`font-pixel text-[10px] tracking-[0.12em] ${got ? "text-gold" : "text-dim"}`}>{item.title.toUpperCase()}</p>
-                      <p className="mt-0.5 text-[10px] text-haze">{item.detail.toLowerCase()}</p>
-                    </div>
+                    <span
+                      key={item.id}
+                      title={item.detail}
+                      className={`border px-2 py-1 font-pixel text-[9px] tracking-[0.08em] ${got ? "border-gold/60 bg-gold/15 text-gold" : "border-line/70 text-dim"}`}
+                    >
+                      {item.title.toUpperCase()}
+                    </span>
                   );
                 })}
               </div>
             </section>
-
-            <div className="text-center lg:text-left">
-              <p className="text-sm text-haze">
-                ten real premier league players · one attribute from each · <span className="text-chalk">38 matchweeks to prove it</span>
-              </p>
-              <button type="button" onClick={kickOff} className="glow-flood mt-5 w-full bg-turf py-4 font-pixel text-lg tracking-[0.3em] text-chalk transition hover:bg-stand">
-                ▶ {taken > 0 || season ? "RESUME" : "KICK OFF"} ◀
-              </button>
-              <div className="mt-5 space-y-2 text-left text-xs leading-relaxed text-haze">
-                <p>── each round draws a club, then one of its players. take one of his ten stats. ea rating blended with this season&apos;s form.</p>
-                <p>
-                  ── <span className="text-grass">chemistry</span>: clubmates, same nationality, back lines, front lines and more can boost locked stats.
-                </p>
-                <p>
-                  ── about {Math.round(data.primeChance * 100)}% of rolls arrive in their <span className="text-gold">prime</span>: peak ea + best form.
-                </p>
-                <p>
-                  ── <span className="text-gold">quests</span> pay rerolls. finish top seven to bank more for the next run.
-                </p>
-                <p>── {data.firstTeam} first-teamers, {data.bench} bench. then a random club signs you for 38 weeks.</p>
-              </div>
-              <p className="mt-6 hidden text-[10px] tracking-[0.2em] text-dim uppercase sm:block">enter to start · m to mute · sound recommended</p>
-            </div>
           </div>
         </div>
-        <footer className="border-t border-line px-4 py-3 text-center text-[10px] tracking-wide text-dim">
-          ratings: EA SPORTS FC via ea.com · form: premierleague.com &amp; fpl · a fan project, not affiliated with either
-        </footer>
+        <footer className="border-t border-line px-4 py-2 text-center text-[10px] tracking-wide text-dim">fan project · not affiliated</footer>
       </div>
     );
   }
@@ -690,9 +683,9 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       { w: 0, d: 0, l: 0 },
     );
     const options = [
-      { key: "N", title: "NEW RUN", detail: `fresh build · ${TEAM_REROLLS + bank.team} team / ${PLAYER_REROLLS + bank.player} player rerolls`, glow: "glow-kit" },
-      { key: "R", title: "RUN IT BACK", detail: "same build, same club, new season", glow: "glow-flood" },
-      { key: "C", title: "NEW CLUB", detail: "same build, roll another club", glow: "glow-flood" },
+      { key: "N", title: "NEW RUN", detail: `${TEAM_REROLLS + bank.team}T / ${PLAYER_REROLLS + bank.player}P`, glow: "glow-kit" },
+      { key: "R", title: "RUN IT BACK", detail: "same build", glow: "glow-flood" },
+      { key: "C", title: "NEW CLUB", detail: "new club roll", glow: "glow-flood" },
     ];
     return (
       <div className="crt min-h-screen bg-night font-ui text-chalk">
@@ -721,7 +714,13 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                         {shortName.get(latest.home)} {latest.homeGoals}–{latest.awayGoals} {shortName.get(latest.away)}
                       </p>
                     ) : null}
-                    <button type="button" onClick={() => finishSeason(season.matches, club)} className="border border-line px-3 py-1.5 font-pixel text-xs tracking-[0.2em] text-haze hover:border-flood hover:text-flood">
+                    <button
+                      type="button"
+                      onClick={() => finishSeason(season.matches, club)}
+                      onMouseEnter={() => sfx().play("hover")}
+                      onPointerDown={() => sfx().play("click")}
+                      className="btn-game border border-line px-3 py-1.5 font-pixel text-xs tracking-[0.2em] text-haze hover:border-flood hover:text-flood"
+                    >
                       SKIP ▶▶
                     </button>
                   </div>
@@ -760,7 +759,14 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   {options.map((option) => (
-                    <button key={option.key} type="button" onClick={() => afterSeason(option.key)} className={`${option.glow} group flex items-center justify-between gap-3 bg-stand px-4 py-3 text-left transition hover:-translate-y-0.5 hover:bg-[#13223b] sm:flex-col sm:items-start`}>
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => afterSeason(option.key)}
+                      onMouseEnter={() => sfx().play("hover")}
+                      onPointerDown={() => sfx().play("click")}
+                      className={`btn-game ${option.glow} group flex items-center justify-between gap-3 bg-stand px-4 py-3 text-left hover:bg-[#163528] sm:flex-col sm:items-start`}
+                    >
                       <span>
                         <span className="block font-pixel text-sm tracking-[0.2em] text-chalk">{option.title}</span>
                         <span className="mt-1 block text-[11px] text-haze">{option.detail}</span>
@@ -866,8 +872,12 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       <button
         type="button"
         onClick={rerollTeam}
+        onMouseEnter={() => sfx().play("hover")}
+        onPointerDown={() => {
+          if (!spinning && teamRerolls > 0) sfx().play("click");
+        }}
         disabled={spinning || teamRerolls <= 0}
-        className={`glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        className={`btn-game glow-flood flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
         title="New club and a new player from it"
       >
         {compact ? "TEAM" : "REROLL TEAM"} <span className="font-digits text-xl leading-none text-flood">{teamRerolls}</span>
@@ -876,8 +886,12 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
       <button
         type="button"
         onClick={rerollPlayer}
+        onMouseEnter={() => sfx().play("hover")}
+        onPointerDown={() => {
+          if (!spinning && playerRerolls > 0 && clubPool.length >= 2) sfx().play("click");
+        }}
         disabled={spinning || playerRerolls <= 0 || clubPool.length < 2}
-        className={`glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] transition hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
+        className={`btn-game glow-kit flex items-center justify-center gap-2 bg-turf font-pixel tracking-[0.15em] hover:bg-stand disabled:opacity-35 ${compact ? "flex-1 px-2 py-2.5 text-[10px]" : "px-3 py-2 text-[11px]"}`}
         title={`Another ${rolled.teamName} player`}
       >
         {compact ? "PLAYER" : "REROLL PLAYER"} <span className="font-digits text-xl leading-none text-kit">{playerRerolls}</span>
@@ -965,7 +979,6 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       <p className="font-pixel text-[10px] tracking-[0.12em] text-chalk">{quest.title.toUpperCase()}</p>
                       <RewardChip reward={quest.reward} muted={complete} />
                     </div>
-                    <p className="mt-0.5 text-[10px] leading-snug text-haze">{quest.detail.toLowerCase()}</p>
                     <div className="mt-1.5 flex gap-0.5">
                       {Array.from({ length: quest.target }, (_, index) => (
                         <span key={index} className={`h-1 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
@@ -987,10 +1000,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 ))}
               </ul>
             ) : null}
-            <p className="mt-2 px-0.5 text-[10px] text-dim">
-              {complete ? "build complete. quests closed for this run." : "the streak quest resets whenever you reroll."}
-              {hasBank ? <span className="text-gold/80"> banked for next run: {rewardText(bank)}.</span> : null}
-            </p>
+            {hasBank ? <p className="mt-2 px-0.5 text-[10px] text-gold/80">banked: {rewardText(bank)}</p> : null}
           </section>
         </div>
 
@@ -1029,13 +1039,16 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                       type="button"
                       disabled={spinning}
                       onClick={() => choose(stat)}
+                      onMouseEnter={() => {
+                        if (!owned && !spinning) sfx().play("hover");
+                      }}
                       style={{ animationDelay: `${index * 30}ms` }}
-                      className={`group relative min-w-0 border px-2.5 py-2 text-left transition sm:px-3 ${spinning ? "" : "animate-tile-in"} ${
+                      className={`btn-game group relative min-w-0 border px-2.5 py-2 text-left sm:px-3 ${spinning ? "" : "animate-tile-in"} ${
                         owned
                           ? "cursor-not-allowed border-line/60 bg-night/40"
                           : rolled.prime
-                            ? "border-kit/70 bg-stand hover:-translate-y-0.5 hover:border-gold hover:bg-[#13223b] active:translate-y-0"
-                            : "border-line bg-stand hover:-translate-y-0.5 hover:border-flood hover:bg-[#13223b] active:translate-y-0"
+                            ? "border-kit/70 bg-stand hover:border-gold hover:bg-[#163528]"
+                            : "border-line bg-stand hover:border-flood hover:bg-[#163528]"
                       }`}
                     >
                       <span className="flex items-start justify-between gap-2">
@@ -1082,7 +1095,14 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                 <div className="text-center">
                   <p className="font-pixel text-[10px] tracking-[0.3em] text-haze">THE LAST ROLL</p>
                   <p className={`mt-3 min-h-12 font-digits text-4xl uppercase sm:text-5xl ${spin?.kind === "club" ? "animate-ticker text-flood" : "text-dim"}`}>{spin?.kind === "club" ? spin.title : "which club signs you?"}</p>
-                  <button type="button" onClick={rollClub} disabled={spinning} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand disabled:opacity-40">
+                  <button
+                    type="button"
+                    onClick={rollClub}
+                    onMouseEnter={() => sfx().play("hover")}
+                    onPointerDown={() => sfx().play("click")}
+                    disabled={spinning}
+                    className="btn-game btn-pulse glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand disabled:opacity-40"
+                  >
                     ▶ ROLL YOUR CLUB ◀
                   </button>
                 </div>
@@ -1096,7 +1116,13 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                   <p className="mx-auto mt-2 max-w-md text-[11px] text-dim">
                     season bonus: <span className="text-gold/80">champions +2 team +2 player · top four +1 each · top seven +1 player</span>
                   </p>
-                  <button type="button" onClick={playSeason} className="glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand">
+                  <button
+                    type="button"
+                    onClick={playSeason}
+                    onMouseEnter={() => sfx().play("hover")}
+                    onPointerDown={() => sfx().play("click")}
+                    className="btn-game btn-pulse glow-flood mt-4 w-full bg-turf py-3 font-pixel text-sm tracking-[0.3em] hover:bg-stand"
+                  >
                     ▶ PLAY 38 MATCHWEEKS ◀
                   </button>
                 </div>
