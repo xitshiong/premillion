@@ -1040,8 +1040,10 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     >
                       <span className="flex items-start justify-between gap-2">
                         <span className="min-w-0">
-                          <span className={`block truncate font-pixel text-[10px] tracking-[0.12em] sm:text-xs sm:tracking-[0.15em] ${owned ? "text-dim" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
-                          <span className={`mt-0.5 block truncate text-[10px] text-dim ${owned ? "" : "hidden sm:block"}`}>{owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}</span>
+                          <span className={`block truncate font-pixel text-[10px] tracking-[0.12em] sm:text-xs sm:tracking-[0.15em] ${owned ? "text-haze" : "text-chalk"}`}>{stat.label.toUpperCase()}</span>
+                          <span className={`mt-0.5 block truncate text-[11px] ${owned ? "text-haze" : "text-chalk/75"} ${owned ? "" : "hidden sm:block"}`}>
+                            {owned ? `locked · ${owned.playerName}` : stat.detail.toLowerCase()}
+                          </span>
                         </span>
                         <Key className="hidden lg:inline-grid">{index === 9 ? 0 : index + 1}</Key>
                       </span>
@@ -1049,18 +1051,18 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                         {owned || spinning ? (
                           <span />
                         ) : (
-                          <span className="min-w-0 font-pixel text-[8px] tracking-widest sm:text-[9px]">
-                            <span className={`block ${info.text} opacity-80`}>{info.label.toUpperCase()}</span>
-                            <span className="block truncate text-dim normal-case tracking-normal">
+                          <span className="min-w-0 font-pixel text-[10px] tracking-widest sm:text-[11px]">
+                            <span className={`block ${info.text}`}>{info.label.toUpperCase()}</span>
+                            <span className="mt-0.5 block truncate text-[11px] normal-case tracking-normal text-chalk/80">
                               {stat.form === null ? `EA ${stat.ea}` : `EA ${stat.ea} · form ${stat.form}`}
                               {delta ? ` · ${delta > 0 ? "+" : "−"}${Math.abs(delta)}` : ""}
                             </span>
                           </span>
                         )}
                         {spinning ? (
-                          <span className="animate-roll-glow font-digits text-4xl leading-none text-dim sm:text-5xl">??</span>
+                          <span className="animate-roll-glow font-digits text-4xl leading-none text-haze sm:text-5xl">??</span>
                         ) : (
-                          <span className={`font-digits text-4xl leading-none sm:text-5xl ${owned ? "text-dim line-through decoration-1" : info.text}`}>{stat.value}</span>
+                          <span className={`font-digits text-4xl leading-none sm:text-5xl ${owned ? "text-haze line-through decoration-1" : info.text}`}>{stat.value}</span>
                         )}
                       </span>
                       {hint ? (
