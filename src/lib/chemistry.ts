@@ -68,6 +68,9 @@ export type ChemLink = {
   current: number;
   target: number;
   color: string;
+  /** Exclusive group — only the strongest paying link in a family applies. */
+  family: string;
+  trackId: ChemTrackId;
 };
 
 const DEF_KEYS: BuildStatKey[] = ["def", "phy", "reactions", "headingAccuracy"];
@@ -77,7 +80,7 @@ const GLOVE_KEYS: BuildStatKey[] = ["def", "phy", "reactions", "pas"];
 const CREATE_KEYS: BuildStatKey[] = ["pas", "vision", "dri", "finishing"];
 
 /** Soft ceiling so stacked chemistries stay strong without blowing past 99 instantly. */
-export const CHEM_BOOST_CAP = 8;
+export const CHEM_BOOST_CAP = 5;
 
 function uniquePlayers(picks: PickRecord[]): ChemPlayer[] {
   const seen = new Map<number, ChemPlayer>();
@@ -142,7 +145,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       id: "clubhouse",
       label: "clubhouse",
       target: 5,
-      boost: 4,
+      boost: 3,
       keys: "all",
       color: "bg-gold",
       howto: `lock 5 players from ${player.teamName} · big club chem`,
@@ -164,7 +167,7 @@ export function chemTracksFor(player: ChemPlayer): ChemTrack[] {
       id: "nation-five",
       label: player.nationality ? `${player.nationality.toLowerCase()} five` : "nation five",
       target: 5,
-      boost: 3,
+      boost: 2,
       keys: "all",
       color: "bg-flood",
       howto: player.nationality ? `lock 5 players from ${player.nationality}` : "lock 5 players from the same country",
@@ -321,6 +324,16 @@ function linkKey(track: ChemTrack, player: ChemPlayer) {
   return track.id;
 }
 
+/** Ladder / bond families — only the strongest link in a family can grant a boost. */
+function linkFamily(trackId: ChemTrackId, player: ChemPlayer): string {
+  if (trackId === "mates" || trackId === "teammates" || trackId === "clubhouse") return `club:${player.teamId}`;
+  if (trackId === "nation" || trackId === "nation-five") return `nation:${player.nationality ?? "none"}`;
+  if (trackId === "best-friends" || trackId === "star-pair") return `bond:${player.teamId}`;
+  return `solo:${trackId}`;
+}
+
+const LADDER_IDS = new Set<ChemTrackId>(["mates", "teammates", "clubhouse", "nation", "nation-five", "best-friends", "star-pair"]);
+
 /** Active / completed chemistry for the build panel. */
 export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
   const players = uniquePlayers(picks);
@@ -351,13 +364,15 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
           : track.id === "nation" || track.id === "nation-five"
             ? track.label
             : track.label;
-      // Big unfinished tracks only drip when you're one away; early tiers can drip sooner.
+      // Ladder tracks only pay out when complete. Unique tracks can drip when one away.
       const nearComplete = hint.current >= track.target - 1;
-      const drip =
-        hint.complete ? track.boost : nearComplete ? Math.max(1, Math.floor(track.boost / 2)) : track.target <= 2 ? Math.max(1, Math.floor(track.boost / 2)) : 0;
-      if (!drip && !hint.complete) {
-        // Still surface progress in the panel with no boost yet.
-      }
+      const drip = hint.complete
+        ? track.boost
+        : LADDER_IDS.has(track.id)
+          ? 0
+          : nearComplete || track.target <= 2
+            ? Math.max(1, Math.floor(track.boost / 2))
+            : 0;
       links.push({
         id: key,
         title,
@@ -369,8 +384,28 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
         current: hint.current,
         target: track.target,
         color: track.color,
+        family: linkFamily(track.id, player),
+        trackId: track.id,
       });
     }
+  }
+
+  // Within each family, only the strongest paying link keeps its boost; weaker repeats show as progress only.
+  const bestByFamily = new Map<string, number>();
+  for (const link of links) {
+    if (link.boost <= 0) continue;
+    bestByFamily.set(link.family, Math.max(bestByFamily.get(link.family) ?? 0, link.boost));
+  }
+  const claimed = new Set<string>();
+  for (const link of links) {
+    if (link.boost <= 0) continue;
+    const best = bestByFamily.get(link.family) ?? 0;
+    if (link.boost < best || claimed.has(link.family)) {
+      link.boost = 0;
+      link.howto = `${link.howto} · topped by a stronger chem`;
+      continue;
+    }
+    claimed.add(link.family);
   }
 
   return links;
@@ -459,8 +494,10 @@ export function rolledChemHints(rolled: RollPlayer, picks: PickRecord[]): ChemHi
 export function chemistryBoosts(picks: PickRecord[], links = evaluateChemistry(picks)) {
   const boosts = new Map<string, number>();
   for (const pick of picks) {
+    // Family exclusivity is already applied on link.boost; just sum paying links.
     let total = 0;
     for (const link of links) {
+      if (link.boost <= 0) continue;
       if (!link.playerIds.includes(pick.playerId)) continue;
       if (link.keys !== "all" && !link.keys.includes(pick.key)) continue;
       total += link.boost;
