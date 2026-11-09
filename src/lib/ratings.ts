@@ -22,7 +22,7 @@ export const FORM_WEIGHT = 0.28;
 export const FULL_FORM_MINUTES = 900;
 export const MAX_FORM_DRAG = 5;
 export const MAX_FORM_BOOST = 10;
-/** Chance that a rolled player arrives in his prime (peak EA + best form). */
+/** Chance that a rolled player arrives in his prime (best-ever card). */
 export const PRIME_CHANCE = 0.12;
 
 /** Position primaries get a soft floor so a CB can't fall to 50 defending off a quiet tackle count. */
@@ -109,23 +109,32 @@ export function clubWithUser(club: ClubRating, user: { attack: number; defense: 
 }
 
 /**
- * Peak card for a roll: each stat is the better of EA and form, then primary position stats
- * get a small lift toward the player's own highest EA attribute (never inventing a new ceiling).
+ * Best-ever card for a roll: every attribute uses the player's peak reading (EA or form),
+ * and position primaries climb to their personal best — the best number they have on the card.
+ * Never invents a ceiling above that personal best.
  */
 export function asPrime(player: RollPlayer): RollPlayer {
   if (player.prime) return player;
-  const bestEa = Math.max(...player.stats.map((stat) => stat.ea));
+  const readings = player.stats.flatMap((stat) => [stat.ea, ...(stat.form !== null ? [stat.form] : [])]);
+  const personalBest = Math.max(player.eaOverall, ...readings);
   const primaries = new Set(POSITION_KEYS[player.position] ?? []);
   const stats = player.stats.map((stat) => {
-    const peak = Math.max(stat.ea, stat.form ?? stat.ea);
-    const lift = primaries.has(stat.key) ? Math.round((bestEa - peak) * 0.2) : 0;
-    return { ...stat, value: Math.min(99, Math.max(peak, peak + lift)) };
+    // Best this attribute has ever shown in our data (card EA or season form mapped to EA scale).
+    const ownBest = Math.max(stat.ea, stat.form ?? 0);
+    if (primaries.has(stat.key)) {
+      // Primaries play their career-best game: sit on / next to the player's peak attribute.
+      return { ...stat, value: Math.min(99, Math.max(ownBest, personalBest - 1, Math.round(ownBest + (personalBest - ownBest) * 0.85))) };
+    }
+    // Secondaries also rise — a prime night — but stay below the personal-best ceiling.
+    const lift = Math.round(ownBest + (personalBest - ownBest) * 0.45);
+    return { ...stat, value: Math.min(99, Math.max(ownBest, lift)) };
   });
   const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
+  const overall = Math.min(99, Math.max(player.eaOverall + 2, buildRating(stats), personalBest - 1));
   return {
     ...player,
     prime: true,
-    overall: Math.min(99, player.eaOverall + Math.max(1, formDelta)),
+    overall,
     formDelta,
     stats,
   };
