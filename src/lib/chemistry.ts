@@ -334,11 +334,13 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
       if (seen.has(key)) continue;
       const hint = trackProgress(track, players);
       const minShow =
-        track.id === "spine" || track.id === "squad-depth" || track.id === "mates" || track.id === "best-friends" || track.id === "star-pair"
-          ? track.target
-          : track.id === "gloves" || track.id === "providers"
-            ? 2
-            : Math.min(2, track.target);
+        track.id === "clubhouse" || track.id === "nation-five"
+          ? 4
+          : track.id === "spine" || track.id === "squad-depth" || track.id === "mates" || track.id === "best-friends" || track.id === "star-pair"
+            ? track.target
+            : track.id === "gloves" || track.id === "providers" || track.id === "teammates" || track.id === "nation"
+              ? 2
+              : Math.min(2, track.target);
       if (hint.current < minShow) continue;
       const memberIds = players.filter((item) => track.includes(item)).map((item) => item.playerId);
       if (memberIds.length < 2 && track.id !== "spine" && track.id !== "squad-depth" && track.id !== "gloves") continue;
@@ -349,13 +351,19 @@ export function evaluateChemistry(picks: PickRecord[]): ChemLink[] {
           : track.id === "nation" || track.id === "nation-five"
             ? track.label
             : track.label;
+      // Big unfinished tracks only drip when you're one away; early tiers can drip sooner.
+      const nearComplete = hint.current >= track.target - 1;
+      const drip =
+        hint.complete ? track.boost : nearComplete ? Math.max(1, Math.floor(track.boost / 2)) : track.target <= 2 ? Math.max(1, Math.floor(track.boost / 2)) : 0;
+      if (!drip && !hint.complete) {
+        // Still surface progress in the panel with no boost yet.
+      }
       links.push({
         id: key,
         title,
         detail: `${hint.current}/${hint.target}`,
         howto: hint.howto,
-        // Incomplete high-tier tracks still drip a little chem once they appear.
-        boost: hint.complete ? track.boost : Math.max(1, Math.floor(track.boost / 2)),
+        boost: drip,
         keys: track.keys,
         playerIds: memberIds,
         current: hint.current,
