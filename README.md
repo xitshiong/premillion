@@ -1,10 +1,12 @@
-# Premier League Player Book
+# Frankenballer
 
-A database of the players on 2026/27 Premier League club lists, and a browser for those numbers.
+A Premier League build game. You stitch one footballer together from ten real players, then play a season with him. It sits on top of a database of the players on 2026/27 Premier League club lists, and the stat book at `/book` lets you browse that data.
+
+The look is a pixel night match: a stadium, scanlines, and pink and cyan type. Every sound is synthesized live with the Web Audio API, so there are no audio files. Sound starts when you press Kick Off. M mutes it, and the setting is remembered. Keys: Enter starts, T rerolls the team, Y rerolls the player, 1–9 and 0 pick a stat.
 
 The season is still going. Gameweeks 1–9 were finished when the feeds were fetched. Gameweek 10 was the current gameweek and was not marked data-checked, so a few totals can still move. Rates are per 90 minutes, and a percentile is only stored once a player has 270 minutes.
 
-The home page is the build game. Each round rolls a club, then a player from that club, and you take one of his ten EA SPORTS FC ratings (pace, shooting, passing, dribbling, defending, physical, finishing, vision, reactions, heading). Reroll team (6) gives a new club and a new player. Reroll player (8) keeps the club. Only outfielders with at least 3 appearances and 270 Premier League minutes this season are in the roll. 7 or more appearances counts as first team, the rest as bench.
+The home page is the build game. Each round rolls a club, then a player from that club, and you take one of his ten EA SPORTS FC ratings (pace, shooting, passing, dribbling, defending, physical, finishing, vision, reactions, heading). Reroll team (6 per build) gives a new club and a new player. Reroll player (8 per build) keeps the club. Only outfielders with at least 3 appearances and 270 Premier League minutes this season are in the roll. 7 or more appearances counts as first team, the rest as bench.
 
 After ten picks you roll the club you join, and all 38 matchweeks are simulated. Each club is rated from the EA ratings of its 10 most-used outfielders, and you replace the lowest-rated of them. A match turns attack against defence into expected goals at this season’s scoring rate, and the score is drawn at random. It is a simulation, not a forecast.
 

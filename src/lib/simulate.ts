@@ -103,8 +103,13 @@ export function simulateSeason(args: {
     }
   });
 
+  return { matches, table: tableAt(args.clubs, matches, weeks.length), weeks: weeks.length };
+}
+
+export function tableAt(clubs: { id: number; name: string; abbr: string | null }[], allMatches: MatchResult[], throughWeek: number) {
+  const matches = allMatches.filter((match) => match.week <= throughWeek);
   const rows = new Map<number, TableRow>();
-  for (const club of args.clubs) {
+  for (const club of clubs) {
     rows.set(club.id, {
       id: club.id,
       name: club.name,
@@ -143,9 +148,8 @@ export function simulateSeason(args: {
       away.points += 1;
     }
   }
-  const table = [...rows.values()].sort((a, b) => {
+  return [...rows.values()].sort((a, b) => {
     const goalDiff = b.goalsFor - b.goalsAgainst - (a.goalsFor - a.goalsAgainst);
     return b.points - a.points || goalDiff || b.goalsFor - a.goalsFor || a.name.localeCompare(b.name);
   });
-  return { matches, table, weeks: weeks.length };
 }

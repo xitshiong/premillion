@@ -5,11 +5,57 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  --color-night: #060a13;
+  --color-turf: #0b1424;
+  --color-stand: #101c31;
+  --color-line: #1c2c47;
+  --color-chalk: #eaf1ff;
+  --color-haze: #8394b6;
+  --color-dim: #4c5f82;
+  --color-flood: #5ee6ff;
+  --color-kit: #ff5d8f;
+  --color-gold: #ffd166;
+  --color-grass: #4fd68f;
+  --color-tier-world: #ffd166;
+  --color-tier-elite: #ff7bac;
+  --color-tier-starter: #7deaff;
+  --color-tier-squad: #d7e1f2;
+  --color-tier-bench: #6a7fa6;
+
+  --font-pixel: var(--nf-pixel), ui-monospace, monospace;
+  --font-digits: var(--nf-digits), ui-monospace, monospace;
+  --font-ui: var(--font-ui-mono), ui-monospace, monospace;
+
   --animate-card-pop: card-pop 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
   --animate-tile-in: tile-in 320ms ease-out both;
-  --animate-slot-fill: slot-fill 500ms ease-out both;
+  --animate-slot-fill: slot-fill 600ms ease-out both;
   --animate-ticker: ticker 70ms linear infinite;
   --animate-roll-glow: roll-glow 700ms ease-in-out infinite;
+  --animate-flicker: flicker 4s steps(1) infinite;
+  --animate-bob: bob 3.2s ease-in-out infinite;
+  --animate-blink: blink 1.1s steps(1) infinite;
+  --animate-shake: shake 260ms ease-in-out both;
+
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    41% { opacity: 0.86; }
+    42% { opacity: 1; }
+    77% { opacity: 0.92; }
+    78% { opacity: 1; }
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
 
   @keyframes card-pop {
     0% { opacity: 0; transform: scale(0.92) translateY(8px); }
@@ -20,8 +66,8 @@
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
   @keyframes slot-fill {
-    0% { box-shadow: 0 0 0 0 rgba(246, 196, 83, 0.7); }
-    100% { box-shadow: 0 0 0 10px rgba(246, 196, 83, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(94, 230, 255, 0.7); background-color: rgba(94, 230, 255, 0.18); }
+    100% { box-shadow: 0 0 0 10px rgba(94, 230, 255, 0); }
   }
   @keyframes ticker {
     0% { transform: translateY(-6px); opacity: 0.5; filter: blur(1px); }
@@ -33,8 +79,53 @@
   }
 }
 
+.crt::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+
+.title-split {
+  text-shadow:
+    -3px 0 0 rgba(255, 93, 143, 0.9),
+    3px 0 0 rgba(94, 230, 255, 0.9);
+}
+
+.glow-flood {
+  box-shadow:
+    0 0 0 1px rgba(94, 230, 255, 0.9),
+    0 0 18px rgba(94, 230, 255, 0.28),
+    inset 0 0 18px rgba(94, 230, 255, 0.08);
+}
+
+.glow-kit {
+  box-shadow:
+    0 0 0 1px rgba(255, 93, 143, 0.9),
+    0 0 18px rgba(255, 93, 143, 0.22),
+    inset 0 0 18px rgba(255, 93, 143, 0.07);
+}
+
+/* Stepped corners, so panels read as pixel frames rather than rounded cards. */
+.pixel-frame {
+  clip-path: polygon(
+    0 6px, 3px 6px, 3px 3px, 6px 3px, 6px 0,
+    calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%,
+    6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px)
+  );
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-card-pop, .animate-tile-in, .animate-slot-fill, .animate-ticker, .animate-roll-glow {
+  .animate-card-pop, .animate-tile-in, .animate-slot-fill, .animate-ticker, .animate-roll-glow,
+  .animate-flicker, .animate-bob, .animate-blink, .animate-shake {
     animation: none;
   }
 }
