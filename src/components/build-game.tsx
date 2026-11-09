@@ -109,6 +109,17 @@ function verdict(place: number) {
   return { title: "Relegated", line: "the stitches didn't hold.", sound: "relegated" as const, color: "text-kit" };
 }
 
+function hexLuma(hex: string) {
+  const raw = hex.replace("#", "");
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  const n = Number.parseInt(full, 16);
+  if (Number.isNaN(n)) return 0.5;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
 /** Flat 2D shirt-back with sleeves, surname and squad number. */
 function JerseyBack({
   teamId,
@@ -126,82 +137,88 @@ function JerseyBack({
   const kit = kitForTeam(teamId);
   const shown = number != null ? String(number) : "—";
   const fillId = `kit-${teamId}-${name.replace(/\s+/g, "")}`;
-  const nameSize = name.length > 12 ? 7.5 : name.length > 9 ? 8.5 : 10;
+  const nameSize = name.length > 14 ? 9 : name.length > 10 ? 11 : 13;
+  // Light print or stripes need a dark outline so name/number stay readable.
+  const needsDarkOutline = Boolean(kit.stripe) || hexLuma(kit.number) > 0.62 || hexLuma(kit.primary) > 0.72;
+  const textStroke = needsDarkOutline ? "#0a0a0a" : "rgba(0,0,0,0.35)";
+  const textProps = {
+    fill: kit.number,
+    stroke: textStroke,
+    strokeWidth: needsDarkOutline ? 1.35 : 0.7,
+    paintOrder: "stroke fill" as const,
+    style: { fontFamily: "var(--nf-display), Arial Narrow, sans-serif" },
+  };
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_40%,#123024_0%,#06140e_70%)] p-2 sm:p-3"
+      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_35%,#123024_0%,#06140e_72%)] px-3 py-2 sm:px-4"
       aria-label={`${name} ${shown}, ${teamName}`}
     >
-      <svg viewBox="0 0 160 150" className="h-full max-h-full w-auto drop-shadow-[0_8px_18px_rgba(0,0,0,0.55)]" role="img">
+      <svg
+        viewBox="0 0 200 170"
+        className="h-auto w-[92%] max-h-[96%] drop-shadow-[0_10px_20px_rgba(0,0,0,0.55)]"
+        role="img"
+        preserveAspectRatio="xMidYMid meet"
+      >
         <defs>
           {kit.stripe ? (
-            <pattern id={fillId} width="10" height="10" patternUnits="userSpaceOnUse">
-              <rect width="10" height="10" fill={kit.primary} />
-              <rect x="6" width="4" height="10" fill={kit.stripe} />
+            <pattern id={fillId} width="14" height="14" patternUnits="userSpaceOnUse">
+              <rect width="14" height="14" fill={kit.primary} />
+              <rect x="7" width="7" height="14" fill={kit.stripe} />
             </pattern>
           ) : (
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={kit.primary} />
-              <stop offset="100%" stopColor={kit.primary} stopOpacity="0.9" />
+              <stop offset="100%" stopColor={kit.primary} stopOpacity="0.92" />
             </linearGradient>
           )}
         </defs>
 
-        {/* Classic flat football shirt: wide short sleeves + torso */}
+        {/* Normal football-shirt proportions: broad torso + short sleeves */}
         <path
-          d="M52 22
-             L58 8
-             L68 18
-             L80 18
-             L90 8
-             L96 22
-             L148 40
-             L138 72
-             L112 58
-             L112 138
-             L48 138
-             L48 58
-             L22 72
-             L12 40
+          d="M62 28
+             L70 10
+             L84 22
+             L100 22
+             L116 10
+             L124 28
+             L188 48
+             L176 88
+             L142 70
+             L142 158
+             L58 158
+             L58 70
+             L24 88
+             L12 48
              Z"
           fill={`url(#${fillId})`}
           stroke={kit.secondary}
-          strokeWidth="2"
+          strokeWidth="2.2"
           strokeLinejoin="round"
         />
 
-        {/* neck hole */}
-        <ellipse cx="80" cy="16" rx="12" ry="7" fill="#06140e" />
-        <path d="M68 18 Q80 28 92 18" fill="none" stroke={kit.secondary} strokeWidth="1.5" />
+        {/* collar */}
+        <ellipse cx="100" cy="20" rx="16" ry="9" fill="#06140e" />
+        <path d="M84 22 Q100 34 116 22" fill="none" stroke={kit.secondary} strokeWidth="1.8" />
 
-        {/* sleeve ends */}
-        <path d="M12 40 L22 72" fill="none" stroke={kit.secondary} strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M148 40 L138 72" fill="none" stroke={kit.secondary} strokeWidth="2.4" strokeLinecap="round" />
+        {/* cuff lines */}
+        <path d="M12 48 L24 88" fill="none" stroke={kit.secondary} strokeWidth="2.6" strokeLinecap="round" />
+        <path d="M188 48 L176 88" fill="none" stroke={kit.secondary} strokeWidth="2.6" strokeLinecap="round" />
 
-        {/* side seams */}
-        <path d="M48 58 L48 138" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.35" />
-        <path d="M112 58 L112 138" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.35" />
+        {/* seams + hem */}
+        <path d="M58 70 L58 158" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.3" />
+        <path d="M142 70 L142 158" fill="none" stroke={kit.secondary} strokeWidth="1" opacity="0.3" />
+        <path d="M58 158 L142 158" fill="none" stroke={kit.secondary} strokeWidth="1.8" opacity="0.55" />
 
-        {/* hem */}
-        <path d="M48 138 L112 138" fill="none" stroke={kit.secondary} strokeWidth="1.6" opacity="0.6" />
-
-        <text
-          x="80"
-          y="52"
-          textAnchor="middle"
-          fill={kit.number}
-          fontSize={nameSize}
-          letterSpacing="1.4"
-          style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
-        >
+        <text x="100" y="58" textAnchor="middle" fontSize={nameSize} letterSpacing="1.6" {...textProps}>
           {name}
         </text>
         <text
-          x="80"
-          y="100"
+          x="100"
+          y="118"
           textAnchor="middle"
-          fill={kit.number}
-          fontSize={shown.length > 1 ? 44 : 52}
+          fontSize={shown.length > 1 ? 54 : 62}
+          letterSpacing="1"
+          {...textProps}
           style={{ fontFamily: "var(--nf-condensed), Arial Narrow, sans-serif", fontWeight: 700 }}
         >
           {shown}
@@ -209,14 +226,14 @@ function JerseyBack({
 
         {prime ? (
           <g>
-            <rect x="58" y="118" width="44" height="10" fill="#ff5a3c" />
+            <rect x="74" y="136" width="52" height="12" fill="#ff5a3c" stroke="#0a0a0a" strokeWidth="0.8" />
             <text
-              x="80"
-              y="126"
+              x="100"
+              y="145"
               textAnchor="middle"
               fill="#06140e"
-              fontSize="6.5"
-              letterSpacing="1.5"
+              fontSize="7"
+              letterSpacing="1.6"
               style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
             >
               PRIME
