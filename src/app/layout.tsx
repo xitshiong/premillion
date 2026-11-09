@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Figtree, Newsreader } from "next/font/google";
-import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
 const sans = Figtree({
@@ -15,19 +14,16 @@ const serif = Newsreader({
 
 export const metadata: Metadata = {
   title: {
-    default: "Premier League Player Book",
+    default: "Build your Premier League player",
     template: "%s · Player Book",
   },
-  description: "2026/27 Premier League players, with season counts taken from the published feeds and rates calculated from those counts.",
+  description: "Roll a first-team or bench Premier League player and take one published attribute at a time.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable} h-full antialiased`}>
-      <body className="min-h-full bg-background text-foreground">
-        <SiteHeader />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-      </body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

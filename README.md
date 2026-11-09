@@ -4,7 +4,7 @@ A database of the players on 2026/27 Premier League club lists, and a browser fo
 
 The season is still going. Gameweeks 1–9 were finished when the feeds were fetched. Gameweek 10 was the current gameweek and was not marked data-checked, so a few totals can still move. Rates are per 90 minutes, and a percentile is only stored once a player has 270 minutes.
 
-This is the player book the build-a-player game will draw from. The matchweek simulator is not in this version.
+The home page is the build game. Roll a first-team or bench outfielder, take one of their ten percentiles, and repeat until the player is complete. Players with no minutes, and anyone under 270 minutes, are not in the roll. You get 8 player rerolls and 6 club rerolls. The big number is the percentile and the small number is the published rate. After ten picks, the 38 matchweeks are simulated: each club’s attack and defence come from those percentiles, a match becomes expected goals, and the score is drawn at random. It is a simulation, not a forecast.
 
 ## Where the numbers come from
 
