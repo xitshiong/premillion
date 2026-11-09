@@ -42,6 +42,13 @@ export type RollStat = {
   form: number | null;
 };
 
+/** Precomputed best-ever card so every rollable player always has a prime variant. */
+export type PrimeVariant = {
+  overall: number;
+  formDelta: number;
+  stats: RollStat[];
+};
+
 export type RollPlayer = {
   id: number;
   name: string;
@@ -51,6 +58,8 @@ export type RollPlayer = {
   eaOverall: number;
   formDelta: number;
   prime: boolean;
+  /** Always set for players in the roll pool. */
+  primeVariant: PrimeVariant;
   avatarUrl: string | null;
   shirtNumber: number | null;
   jerseyName: string;
@@ -116,8 +125,7 @@ export function clubWithUser(club: ClubRating, user: { attack: number; defense: 
  * and position primaries climb to their personal best — the best number they have on the card.
  * Never invents a ceiling above that personal best.
  */
-export function asPrime(player: RollPlayer): RollPlayer {
-  if (player.prime) return player;
+export function buildPrimeVariant(player: Pick<RollPlayer, "position" | "eaOverall" | "stats">): PrimeVariant {
   const readings = player.stats.flatMap((stat) => [stat.ea, ...(stat.form !== null ? [stat.form] : [])]);
   const personalBest = Math.max(player.eaOverall, ...readings);
   const primaries = new Set(POSITION_KEYS[player.position] ?? []);
@@ -134,11 +142,18 @@ export function asPrime(player: RollPlayer): RollPlayer {
   });
   const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
   const overall = Math.min(99, Math.max(player.eaOverall + 2, buildRating(stats), personalBest - 1));
+  return { overall, formDelta, stats };
+}
+
+export function asPrime(player: RollPlayer): RollPlayer {
+  if (player.prime) return player;
+  const variant = player.primeVariant ?? buildPrimeVariant(player);
   return {
     ...player,
     prime: true,
-    overall,
-    formDelta,
-    stats,
+    primeVariant: variant,
+    overall: variant.overall,
+    formDelta: variant.formDelta,
+    stats: variant.stats,
   };
 }

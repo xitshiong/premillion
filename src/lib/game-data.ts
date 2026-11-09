@@ -10,6 +10,7 @@ import {
   MAX_FORM_DRAG,
   POSITION_KEYS,
   PRIME_CHANCE,
+  buildPrimeVariant,
   strengthFrom,
   type BuildStatKey,
   type ClubRating,
@@ -31,7 +32,8 @@ type EaRating = {
 
 type EaFile = { fetchedAt: string; players: Record<string, EaRating> };
 
-/** Include anyone with an EA card — low-minute stars (Eze) and keepers still roll. */
+/** Must have actually featured (starter or used sub). Unused squad listings stay out. */
+const MIN_APPEARANCES = 1;
 const FIRST_TEAM_APPEARANCES = 7;
 const CORE_SIZE = 10;
 
@@ -92,6 +94,7 @@ export function getGameData(): GameData {
   const candidates: Candidate[] = [];
   for (const player of players) {
     if (player.teamConflict) continue;
+    if (player.appearances < MIN_APPEARANCES) continue;
     if (player.position !== "D" && player.position !== "M" && player.position !== "F" && player.position !== "G") continue;
     const rating = ea.players[String(player.id)];
     if (!rating || BUILD_STATS.some((definition) => typeof rating.stats[definition.key] !== "number")) continue;
@@ -133,7 +136,7 @@ export function getGameData(): GameData {
       return { key: definition.key, label: definition.label, detail: definition.detail, value, ea: eaValue, form };
     });
     const formDelta = Math.round(stats.reduce((sum, stat) => sum + stat.value - stat.ea, 0) / stats.length);
-    return {
+    const base = {
       id: player.id,
       name: player.name,
       position: player.position ?? "",
@@ -141,7 +144,7 @@ export function getGameData(): GameData {
       overall: rating.overall + formDelta,
       eaOverall: rating.overall,
       formDelta,
-      prime: false,
+      prime: false as const,
       avatarUrl: rating.avatarUrl,
       shirtNumber: player.shirtNumber,
       jerseyName: jerseyName(player.name),
@@ -152,8 +155,12 @@ export function getGameData(): GameData {
       appearances: player.appearances,
       goals: player.goals,
       assists: player.assists,
-      role: player.appearances >= FIRST_TEAM_APPEARANCES ? "First team" : "Bench",
+      role: (player.appearances >= FIRST_TEAM_APPEARANCES ? "First team" : "Bench") as RollPlayer["role"],
       stats,
+    };
+    return {
+      ...base,
+      primeVariant: buildPrimeVariant(base),
     };
   });
 
