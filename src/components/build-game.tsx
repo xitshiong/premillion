@@ -109,7 +109,7 @@ function verdict(place: number) {
   return { title: "Relegated", line: "the stitches didn't hold.", sound: "relegated" as const, color: "text-kit" };
 }
 
-/** Shirt back: club kit colours, surname across the shoulders, big number. */
+/** Flat 2D shirt-back with sleeves, surname and squad number. */
 function JerseyBack({
   teamId,
   teamName,
@@ -125,54 +125,101 @@ function JerseyBack({
 }) {
   const kit = kitForTeam(teamId);
   const shown = number != null ? String(number) : "—";
+  const fillId = `kit-${teamId}-${name.replace(/\s+/g, "")}`;
+  const nameSize = name.length > 12 ? 7.5 : name.length > 9 ? 8.5 : 10;
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[linear-gradient(180deg,#0a1a12_0%,#06140e_100%)] p-3 sm:p-4" aria-label={`${name} ${shown}, ${teamName}`}>
-      <div
-        className="relative aspect-[4/5] h-full max-h-full w-auto min-w-[42%] overflow-hidden"
-        style={{
-          background: kit.stripe
-            ? `repeating-linear-gradient(90deg, ${kit.primary} 0 10px, ${kit.stripe} 10px 16px)`
-            : `linear-gradient(165deg, ${kit.primary} 0%, ${kit.primary} 62%, color-mix(in srgb, ${kit.primary} 75%, #000) 100%)`,
-          clipPath: "polygon(18% 6%, 38% 6%, 42% 0%, 58% 0%, 62% 6%, 82% 6%, 96% 18%, 96% 100%, 4% 100%, 4% 18%)",
-          boxShadow: `inset 0 0 0 2px color-mix(in srgb, ${kit.secondary} 35%, transparent), 0 10px 28px rgba(0,0,0,0.45)`,
-        }}
-      >
-        {/* collar / neck */}
-        <div
-          className="absolute top-[5%] left-1/2 h-[10%] w-[22%] -translate-x-1/2 rounded-b-[40%]"
-          style={{ background: `color-mix(in srgb, ${kit.primary} 55%, #000)` }}
+    <div
+      className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(ellipse_at_50%_40%,#123024_0%,#06140e_70%)] p-2 sm:p-3"
+      aria-label={`${name} ${shown}, ${teamName}`}
+    >
+      <svg viewBox="0 0 120 140" className="h-full max-h-full w-auto drop-shadow-[0_8px_18px_rgba(0,0,0,0.55)]" role="img">
+        <defs>
+          {kit.stripe ? (
+            <pattern id={fillId} width="10" height="10" patternUnits="userSpaceOnUse">
+              <rect width="10" height="10" fill={kit.primary} />
+              <rect x="6" width="4" height="10" fill={kit.stripe} />
+            </pattern>
+          ) : (
+            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={kit.primary} />
+              <stop offset="100%" stopColor={kit.primary} stopOpacity="0.88" />
+            </linearGradient>
+          )}
+        </defs>
+
+        {/* shirt body + sleeves silhouette */}
+        <path
+          d="M38 18
+             C42 10, 48 6, 54 4
+             L60 14
+             L66 4
+             C72 6, 78 10, 82 18
+             L108 34
+             L100 58
+             L86 48
+             L86 128
+             L34 128
+             L34 48
+             L20 58
+             L12 34
+             Z"
+          fill={`url(#${fillId})`}
+          stroke={kit.secondary}
+          strokeWidth="1.6"
+          strokeLinejoin="round"
         />
-        {/* shoulder seam */}
-        <div className="absolute top-[14%] right-[8%] left-[8%] h-px opacity-40" style={{ background: kit.secondary }} />
-        <div className="absolute inset-x-[8%] top-[17%] flex flex-col items-center px-1">
-          <p
-            className="w-full text-center font-pixel leading-tight tracking-[0.12em]"
-            style={{
-              color: kit.number,
-              textShadow: "0 1px 0 rgba(0,0,0,0.35)",
-              fontSize: name.length > 11 ? "clamp(0.55rem,1.7vw,0.78rem)" : name.length > 8 ? "clamp(0.65rem,2vw,0.9rem)" : "clamp(0.75rem,2.4vw,1.05rem)",
-            }}
-          >
-            {name}
-          </p>
-          <p
-            className="mt-1 font-digits leading-none"
-            style={{
-              color: kit.number,
-              fontSize: "clamp(3.2rem, 12vw, 5.5rem)",
-              textShadow: "0 2px 0 rgba(0,0,0,0.35)",
-            }}
-          >
-            {shown}
-          </p>
-        </div>
+
+        {/* collar opening */}
+        <path d="M54 4 L60 16 L66 4" fill="none" stroke={kit.secondary} strokeWidth="1.4" strokeLinejoin="round" />
+        <ellipse cx="60" cy="10" rx="9" ry="5" fill="#06140e" />
+
+        {/* sleeve cuffs */}
+        <path d="M12 34 L20 58" fill="none" stroke={kit.secondary} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+        <path d="M108 34 L100 58" fill="none" stroke={kit.secondary} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+
+        {/* hem */}
+        <path d="M34 128 L86 128" fill="none" stroke={kit.secondary} strokeWidth="1.4" opacity="0.55" />
+
+        {/* name + number on the back panel */}
+        <text
+          x="60"
+          y="46"
+          textAnchor="middle"
+          fill={kit.number}
+          fontSize={nameSize}
+          letterSpacing="1.2"
+          style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
+        >
+          {name}
+        </text>
+        <text
+          x="60"
+          y="92"
+          textAnchor="middle"
+          fill={kit.number}
+          fontSize={shown.length > 1 ? 42 : 48}
+          style={{ fontFamily: "var(--nf-condensed), Arial Narrow, sans-serif", fontWeight: 700 }}
+        >
+          {shown}
+        </text>
+
         {prime ? (
-          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-kit px-1.5 py-0.5 font-pixel text-[8px] tracking-[0.2em] text-night">PRIME</span>
+          <g>
+            <rect x="40" y="112" width="40" height="9" fill="#ff5a3c" />
+            <text
+              x="60"
+              y="119"
+              textAnchor="middle"
+              fill="#06140e"
+              fontSize="6"
+              letterSpacing="1.5"
+              style={{ fontFamily: "var(--nf-display), Arial Narrow, sans-serif" }}
+            >
+              PRIME
+            </text>
+          </g>
         ) : null}
-        {/* side panels / sleeves hint */}
-        <div className="absolute top-[20%] bottom-[8%] left-0 w-[7%] opacity-25" style={{ background: kit.secondary }} />
-        <div className="absolute top-[20%] bottom-[8%] right-0 w-[7%] opacity-25" style={{ background: kit.secondary }} />
-      </div>
+      </svg>
     </div>
   );
 }
