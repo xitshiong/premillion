@@ -158,24 +158,26 @@ function ChemBar({ hint, compact = false, tip }: { hint: ChemHint; compact?: boo
   const ratio = Math.min(1, hint.current / hint.target);
   const fill = hint.complete ? "bg-gold" : hint.color;
   const howto = tip ?? hint.howto;
+  // Dark outline so labels stay readable on gold/grass fills and the dark track.
+  const labelShadow =
+    "0 0 2px #04120c, 1px 0 0 #04120c, -1px 0 0 #04120c, 0 1px 0 #04120c, 0 -1px 0 #04120c, 1px 1px 0 #04120c, -1px 1px 0 #04120c";
   return (
     <div className={`group/chem relative ${compact ? "" : "z-10"}`}>
       <div
-        className={`relative overflow-hidden bg-night/85 ${compact ? "h-4" : "h-6"}`}
+        className={`relative overflow-hidden border border-line/70 bg-night ${compact ? "h-5" : "h-7"}`}
         title={howto}
       >
-        <div className={`absolute inset-y-0 left-0 ${fill}`} style={{ width: `${Math.max(ratio * 100, 12)}%` }} />
+        <div className={`absolute inset-y-0 left-0 ${fill}`} style={{ width: `${Math.max(ratio * 100, hint.current > 0 ? 18 : 0)}%` }} />
         <p
-          className={`relative z-[1] truncate px-1.5 font-pixel tracking-[0.04em] ${compact ? "text-[10px] leading-4" : "text-[11px] leading-6"} ${
-            hint.complete || ratio >= 0.4 ? "text-night" : "text-chalk"
-          }`}
+          className={`relative z-[1] truncate px-2 font-pixel tracking-[0.06em] text-chalk ${compact ? "text-[11px] leading-5" : "text-xs leading-7"}`}
+          style={{ textShadow: labelShadow }}
         >
-          {hint.label} {hint.current}/{hint.target}
+          {hint.label.toUpperCase()} {hint.current}/{hint.target}
         </p>
       </div>
       {!compact && howto ? (
-        <div className="pointer-events-none absolute right-0 bottom-full z-30 mb-1 hidden w-[min(240px,70vw)] border border-line bg-night px-2.5 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] group-hover/chem:block">
-          <p className="font-pixel text-[10px] tracking-[0.18em] text-grass">
+        <div className="pointer-events-none absolute right-0 bottom-full z-30 mb-1 hidden w-[min(260px,72vw)] border border-line bg-night px-2.5 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] group-hover/chem:block">
+          <p className="font-pixel text-[11px] tracking-[0.18em] text-grass">
             {hint.label.toUpperCase()} {hint.current}/{hint.target}
           </p>
           <p className="mt-1 text-xs leading-snug text-chalk/90">{howto}</p>
@@ -1008,7 +1010,7 @@ export function BuildGame({ data, seed }: { data: GameData; seed: number }) {
                     </div>
                     <div className="mt-1.5 flex gap-0.5">
                       {Array.from({ length: quest.target }, (_, index) => (
-                        <span key={index} className={`h-1 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
+                        <span key={index} className={`h-1.5 flex-1 ${index < progress ? "bg-gold" : "bg-line"}`} />
                       ))}
                     </div>
                     {open ? (
